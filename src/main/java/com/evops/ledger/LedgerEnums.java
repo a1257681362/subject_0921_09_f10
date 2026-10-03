@@ -20,6 +20,10 @@ public final class LedgerEnums {
     public static final String ORDER_TAKEN_DOWN = "TAKEN_DOWN";
     public static final String ORDER_OFFSET = "OFFSET";
 
+    /** 单据合规状态：正常 / 合规冻结（F10；冻结中落架/对冲/更正/回退全拦，只能合规处置） */
+    public static final String COMPLIANCE_NORMAL = "NORMAL";
+    public static final String COMPLIANCE_FROZEN = "FROZEN";
+
     /** 档期占用：占用中 / 已释放 */
     public static final String SLOT_ACTIVE = "ACTIVE";
     public static final String SLOT_RELEASED = "RELEASED";
@@ -30,6 +34,9 @@ public final class LedgerEnums {
     public static final String EVENT_TAKE_DOWN = "TAKE_DOWN";
     public static final String EVENT_OFFSET = "OFFSET";
     public static final String EVENT_ROLLBACK = "ROLLBACK";
+    /** F10：合规冻结 / 解除冻结 */
+    public static final String EVENT_COMPLIANCE_FREEZE = "COMPLIANCE_FREEZE";
+    public static final String EVENT_COMPLIANCE_UNFREEZE = "COMPLIANCE_UNFREEZE";
 
     /** 经纬度建档状态：未建档 / 已建档 */
     public static final String GEO_UNFILED = "UNFILED";

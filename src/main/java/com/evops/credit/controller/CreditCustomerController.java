@@ -4,6 +4,7 @@ import com.evops.common.ApiResponse;
 import com.evops.common.BusinessException;
 import com.evops.common.Viewer;
 import com.evops.credit.dto.CustomerCreateRequest;
+import com.evops.credit.dto.IndustryCategoryFillRequest;
 import com.evops.credit.dto.LimitApprovalRequest;
 import com.evops.credit.dto.LimitChangeRequest;
 import com.evops.credit.entity.CreditLimitVersion;
@@ -45,10 +46,17 @@ public class CreditCustomerController {
         return v;
     }
 
-    /** 客户建档给信用额度（自动 v1 生效，前值 0）。 */
+    /** 客户建档给信用额度（自动 v1 生效，前值 0）；行业类目命中受限名单当场拦。 */
     @PostMapping("/customers")
     public ApiResponse<Customer> create(@Valid @RequestBody CustomerCreateRequest request) {
         return ApiResponse.ok(customerService.create(request, viewer()));
+    }
+
+    /** 历史客户行业类目补录（仅空可补、仅合规岗/系统；同步回填在途单类目快照）。 */
+    @PostMapping("/customers/{customerNo}/industry-category")
+    public ApiResponse<Map<String, Object>> fillIndustryCategory(@PathVariable String customerNo,
+                                                                 @Valid @RequestBody IndustryCategoryFillRequest request) {
+        return ApiResponse.ok(customerService.fillIndustryCategory(customerNo, request.getIndustryCategory(), viewer()));
     }
 
     /** 客户翻查：销售只看名下，财务/系统看全部。 */

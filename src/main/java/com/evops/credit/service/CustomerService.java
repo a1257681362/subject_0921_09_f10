@@ -1,14 +1,20 @@
 package com.evops.credit.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.evops.common.BusinessException;
 import com.evops.common.Viewer;
+import com.evops.compliance.entity.CategoryListItem;
+import com.evops.compliance.service.CategoryListService;
 import com.evops.credit.CreditEnums;
 import com.evops.credit.dto.CustomerCreateRequest;
 import com.evops.credit.entity.CreditLimitVersion;
 import com.evops.credit.entity.Customer;
 import com.evops.credit.mapper.CreditLimitVersionMapper;
 import com.evops.credit.mapper.CustomerMapper;
+import com.evops.ledger.LedgerEnums;
+import com.evops.ledger.entity.PostingOrder;
+import com.evops.ledger.mapper.PostingOrderMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 客户档案域：建档即授信（v1 直接生效，前值 0）；客户名与报价单客户名精确对应、全局唯一；
@@ -28,17 +36,28 @@ public class CustomerService {
 
     private final CustomerMapper customerMapper;
     private final CreditLimitVersionMapper versionMapper;
+    /** 受限行业名单域：建档口类目校验 */
+    private final CategoryListService categoryListService;
+    /** 类目补录时回填在途单快照用 */
+    private final PostingOrderMapper postingOrderMapper;
 
     public CustomerService(CustomerMapper customerMapper,
-                           CreditLimitVersionMapper versionMapper) {
+                           CreditLimitVersionMapper versionMapper,
+                           CategoryListService categoryListService,
+                           PostingOrderMapper postingOrderMapper) {
         this.customerMapper = customerMapper;
         this.versionMapper = versionMapper;
+        this.categoryListService = categoryListService;
+        this.postingOrderMapper = postingOrderMapper;
     }
 
-    /** 客户建档：给信用额度，自动记 v1（INITIAL，直接生效，前值 0）。 */
+    /** 客户建档：给信用额度，自动记 v1（INITIAL，直接生效，前值 0）；行业类目命中受限名单当场拦。 */
     @Transactional(rollbackFor = Exception.class)
     public Customer create(CustomerCreateRequest request, Viewer viewer) {
         String name = request.getCustomerName().trim();
+        // F10 建档口：行业类目必填且不得命中受限名单（提示带依据）
+        String category = request.getIndustryCategory().trim();
+        categoryListService.requireNotRestricted(category, "客户建档");
         // 销售只能把客户建在自己名下；财务/系统可指定归属销售，留空归经手人
         String owner = viewer.isAllCustomers()
                 ? (request.getOwnerSales() != null && !request.getOwnerSales().trim().isEmpty()
@@ -55,6 +74,7 @@ public class CustomerService {
         Customer customer = new Customer();
         customer.setCustomerNo(generateCustomerNo());
         customer.setCustomerName(name);
+        customer.setIndustryCategory(category);
         customer.setOwnerSales(owner);
         customer.setCreditLimit(limit);
         customer.setOccupiedAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.HALF_UP));
@@ -148,6 +168,49 @@ public class CustomerService {
         Customer customer = requireById(customerId);
         viewer.checkOwn(customer.getOwnerSales());
         return customer;
+    }
+
+    /**
+     * 历史客户行业类目补录（F10）：仅当前为空可补（已有类目没有任何修改口子，防绕名单）；
+     * 补录是登记事实，命中受限名单也允许补，但同步回填该户在途单类目快照，
+     * 让合规岗紧接着的批量冻结能命中。仅合规岗/系统可操作。
+     *
+     * @return 补录结果（客户、回填在途单数、所补类目当前是否受限）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> fillIndustryCategory(String customerNo, String category, Viewer viewer) {
+        viewer.requireListAdmin();
+        Customer customer = requireByNo(customerNo);
+        if (customer.getIndustryCategory() != null && !customer.getIndustryCategory().trim().isEmpty()) {
+            throw new BusinessException("客户「" + customer.getCustomerName() + "」已有行业类目「"
+                    + customer.getIndustryCategory() + "」，行业类目建档后不可改");
+        }
+        String name = category == null ? "" : category.trim();
+        if (name.isEmpty()) {
+            throw new BusinessException("行业类目不能为空");
+        }
+        Customer patch = new Customer();
+        patch.setId(customer.getId());
+        patch.setIndustryCategory(name);
+        customerMapper.updateById(patch);
+
+        // 回填该户挂起中且类目快照为空的在途单，批量冻结按单上快照匹配
+        int backfilled = postingOrderMapper.update(null, new LambdaUpdateWrapper<PostingOrder>()
+                .eq(PostingOrder::getCustomerId, customer.getId())
+                .eq(PostingOrder::getStatus, LedgerEnums.ORDER_HUNG)
+                .isNull(PostingOrder::getIndustryCategory)
+                .set(PostingOrder::getIndustryCategory, name));
+
+        CategoryListItem restricted = categoryListService.findRestricted(name);
+        Map<String, Object> result = new LinkedHashMap<>();
+        customer.setIndustryCategory(name);
+        result.put("customer", customer);
+        result.put("backfilledOrders", backfilled);
+        result.put("restrictedHit", restricted != null);
+        if (restricted != null) {
+            result.put("restrictedBasis", restricted.getBasis());
+        }
+        return result;
     }
 
     public static BigDecimal normalizeMoney(BigDecimal value) {

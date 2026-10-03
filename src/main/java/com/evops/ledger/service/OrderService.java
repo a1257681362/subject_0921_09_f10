@@ -20,6 +20,7 @@ import com.evops.ledger.mapper.PostingOrderMapper;
 import com.evops.ledger.mapper.SiteMapper;
 import com.evops.ledger.mapper.SlotBookingMapper;
 import com.evops.ledger.support.Operators;
+import com.evops.ledger.support.PostingComplianceGateway;
 import com.evops.ledger.support.PostingCreditGateway;
 import com.evops.ledger.support.PostingInstallGateway;
 import com.evops.ledger.support.WeekRanges;
@@ -52,12 +53,15 @@ public class OrderService {
     private final ObjectProvider<PostingCreditGateway> creditGatewayProvider;
     /** 安装派单域可选实现：无安装模块时取不到，上刊流程与 F1 完全一致 */
     private final ObjectProvider<PostingInstallGateway> installGatewayProvider;
+    /** 受限行业名单域可选实现：无合规模块时取不到，普通单不做类目校验 */
+    private final ObjectProvider<PostingComplianceGateway> complianceGatewayProvider;
 
     public OrderService(PostingOrderMapper orderMapper, SlotBookingMapper slotMapper,
                         OrderEventMapper eventMapper, OrderReceiptMapper receiptMapper,
                         SiteMapper siteMapper, ObjectMapper objectMapper,
                         ObjectProvider<PostingCreditGateway> creditGatewayProvider,
-                        ObjectProvider<PostingInstallGateway> installGatewayProvider) {
+                        ObjectProvider<PostingInstallGateway> installGatewayProvider,
+                        ObjectProvider<PostingComplianceGateway> complianceGatewayProvider) {
         this.orderMapper = orderMapper;
         this.slotMapper = slotMapper;
         this.eventMapper = eventMapper;
@@ -66,6 +70,7 @@ public class OrderService {
         this.objectMapper = objectMapper;
         this.creditGatewayProvider = creditGatewayProvider;
         this.installGatewayProvider = installGatewayProvider;
+        this.complianceGatewayProvider = complianceGatewayProvider;
     }
 
     /** 上刊：单号唯一、按周占档（同点位同周冲突拒绝）、归属月按发生日固化。 */
@@ -81,6 +86,20 @@ public class OrderService {
         LocalDate weekEnd = WeekRanges.sundayOf(occurDate);
         String operator = Operators.resolve(request.getOperatorName());
 
+        // F10 行业类目：普通单必填并在提交口校验受限名单（命中当场拒，单据档期都不落）；
+        // 授信单取客户档案类目，由授信网关在占用额度前校验并回写快照
+        boolean creditPosting = request.getQuoteNo() != null && !request.getQuoteNo().trim().isEmpty();
+        String declaredCategory = request.getIndustryCategory() == null ? null : request.getIndustryCategory().trim();
+        if (!creditPosting) {
+            if (declaredCategory == null || declaredCategory.isEmpty()) {
+                throw new BusinessException("普通上刊单必须填报行业类目（受限行业名单校验需要）");
+            }
+            PostingComplianceGateway complianceGateway = complianceGatewayProvider.getIfAvailable();
+            if (complianceGateway != null) {
+                complianceGateway.requireCategoryAllowed(declaredCategory);
+            }
+        }
+
         PostingOrder order = new PostingOrder();
         order.setOrderNo(generateOrderNo());
         order.setOrderKind(LedgerEnums.KIND_POSTING);
@@ -95,6 +114,11 @@ public class OrderService {
         order.setVersionNo(1);
         // 默认普通单不占授信；引用报价单时由授信网关回写为 1（显式置 0，避免只靠库默认值导致实体为 null）
         order.setCreditUsed(0);
+        // 合规状态默认正常；普通单类目快照随单落库固化
+        order.setComplianceStatus(LedgerEnums.COMPLIANCE_NORMAL);
+        if (!creditPosting) {
+            order.setIndustryCategory(declaredCategory);
+        }
         order.setOperatorName(operator);
         order.setRemark(request.getRemark());
         try {
@@ -129,22 +153,27 @@ public class OrderService {
         return order;
     }
 
-    /** 落架：仅挂起中的单可落架；落架即关闭，之后不能再改。 */
+    /** 落架：仅挂起中的单可落架；落架即关闭，之后不能再改。合规冻结中的单只能走合规强制落架。 */
     @Transactional(rollbackFor = Exception.class)
     public PostingOrder takeDown(String orderNo, ActionRequest request) {
         PostingOrder order = requireByNo(orderNo);
         requireHung(order, "落架");
+        requireNotFrozen(order, "落架");
         LocalDate occurDate = request.getOccurDate() != null ? request.getOccurDate() : LocalDate.now();
         String operator = Operators.resolve(request.getOperatorName());
+        return doTakeDown(order, occurDate, operator,
+                request.getReason() != null ? request.getReason() : "画面落架");
+    }
 
+    /** 落架主流程：关闭单据、释放档期、授信释放转应收、写事件。 */
+    private PostingOrder doTakeDown(PostingOrder order, LocalDate occurDate, String operator, String detail) {
         order.setStatus(LedgerEnums.ORDER_TAKEN_DOWN);
         order.setClosedTime(LocalDateTime.now());
         orderMapper.updateById(order);
         releaseSlot(order);
         // 授信单落架：撤刊即释放额度，未核销额转应收继续按单核销；普通单无占用行，内部直接跳过
         releaseCredit(order, false, operator);
-        recordEvent(order, LedgerEnums.EVENT_TAKE_DOWN, occurDate, operator, null,
-                request.getReason() != null ? request.getReason() : "画面落架");
+        recordEvent(order, LedgerEnums.EVENT_TAKE_DOWN, occurDate, operator, null, detail);
         return order;
     }
 
@@ -156,6 +185,7 @@ public class OrderService {
     public PostingOrder offset(String orderNo, ActionRequest request) {
         PostingOrder original = requireByNo(orderNo);
         requireHung(original, "对冲");
+        requireNotFrozen(original, "对冲");
         LocalDate occurDate = request.getOccurDate() != null ? request.getOccurDate() : LocalDate.now();
         String operator = Operators.resolve(request.getOperatorName());
         String reason = request.getReason() != null && !request.getReason().trim().isEmpty()
@@ -210,6 +240,7 @@ public class OrderService {
     public PostingOrder edit(String orderNo, OrderEditRequest request) {
         PostingOrder order = requireByNo(orderNo);
         requireHung(order, "修改");
+        requireNotFrozen(order, "修改");
         String operator = Operators.resolve(request.getOperatorName());
 
         order.setCreativeName(request.getCreativeName().trim());
@@ -229,6 +260,7 @@ public class OrderService {
     public PostingOrder rollback(String orderNo, RollbackRequest request) {
         PostingOrder order = requireByNo(orderNo);
         requireHung(order, "版本回退");
+        requireNotFrozen(order, "版本回退");
         int target = request.getTargetVersion();
         if (target >= order.getVersionNo()) {
             throw new BusinessException("目标版本 v" + target + " 不是历史版本，当前版本 v" + order.getVersionNo());
@@ -278,14 +310,17 @@ public class OrderService {
         return order;
     }
 
-    /** 翻查：归属月 / 点位 / 状态 / 单号 / 根单链。归属月查的是固化列，不受查询日影响。 */
-    public List<PostingOrder> search(String period, String siteNo, String status, String orderNo) {
+    /** 翻查：归属月 / 点位 / 状态 / 单号 / 根单链 / 合规状态。归属月查的是固化列，不受查询日影响。 */
+    public List<PostingOrder> search(String period, String siteNo, String status, String orderNo, String compliance) {
         LambdaQueryWrapper<PostingOrder> wrapper = new LambdaQueryWrapper<>();
         if (period != null && !period.trim().isEmpty()) {
             wrapper.eq(PostingOrder::getBizPeriod, period.trim());
         }
         if (status != null && !status.trim().isEmpty()) {
             wrapper.eq(PostingOrder::getStatus, status.trim());
+        }
+        if (compliance != null && !compliance.trim().isEmpty()) {
+            wrapper.eq(PostingOrder::getComplianceStatus, compliance.trim());
         }
         if (orderNo != null && !orderNo.trim().isEmpty()) {
             wrapper.like(PostingOrder::getOrderNo, orderNo.trim());
@@ -323,6 +358,66 @@ public class OrderService {
                     + statusText(order.getStatus()) + "），不能" + action
                     + "；如需更正请另开对冲单");
         }
+    }
+
+    /** F10：合规冻结中的单，普通操作（落架/对冲/更正/回退）一律拦，只能由合规岗处置。 */
+    private void requireNotFrozen(PostingOrder order, String action) {
+        if (LedgerEnums.COMPLIANCE_FROZEN.equals(order.getComplianceStatus())) {
+            throw new BusinessException("单据 " + order.getOrderNo() + " 合规冻结中，不能" + action
+                    + "；请联系合规岗处置（解冻或强制落架）");
+        }
+    }
+
+    // ---- F10 合规冻结处置（由合规模块编排调用） ----
+
+    /**
+     * 合规批量冻结：原子条件更新置 FROZEN（已冻结/已关闭的单跳过，并发与重复触发都幂等），
+     * 成功写 COMPLIANCE_FREEZE 事件留底。返回是否真正冻结（false=该单已不可冻，跳过）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean markComplianceFrozen(PostingOrder order, String batchNo, String category, String basis, String operator) {
+        int updated = orderMapper.update(null, new LambdaUpdateWrapper<PostingOrder>()
+                .eq(PostingOrder::getId, order.getId())
+                .eq(PostingOrder::getStatus, LedgerEnums.ORDER_HUNG)
+                .eq(PostingOrder::getComplianceStatus, LedgerEnums.COMPLIANCE_NORMAL)
+                .set(PostingOrder::getComplianceStatus, LedgerEnums.COMPLIANCE_FROZEN));
+        if (updated == 0) {
+            return false;
+        }
+        order.setComplianceStatus(LedgerEnums.COMPLIANCE_FROZEN);
+        recordEvent(order, LedgerEnums.EVENT_COMPLIANCE_FREEZE, LocalDate.now(), operator, null,
+                "合规冻结（批次 " + batchNo + "）：行业类目「" + category + "」在受限名单内，依据：" + basis);
+        return true;
+    }
+
+    /** 合规解冻：恢复 NORMAL 并写事件留底；不在冻结状态直接拒。 */
+    @Transactional(rollbackFor = Exception.class)
+    public void markComplianceUnfrozen(PostingOrder order, String operator, String reason) {
+        int updated = orderMapper.update(null, new LambdaUpdateWrapper<PostingOrder>()
+                .eq(PostingOrder::getId, order.getId())
+                .eq(PostingOrder::getComplianceStatus, LedgerEnums.COMPLIANCE_FROZEN)
+                .set(PostingOrder::getComplianceStatus, LedgerEnums.COMPLIANCE_NORMAL));
+        if (updated == 0) {
+            throw new BusinessException("单据 " + order.getOrderNo() + " 不在合规冻结状态，不能解冻");
+        }
+        order.setComplianceStatus(LedgerEnums.COMPLIANCE_NORMAL);
+        recordEvent(order, LedgerEnums.EVENT_COMPLIANCE_UNFREEZE, LocalDate.now(), operator, null,
+                "合规解冻" + (reason != null && !reason.trim().isEmpty() ? "：" + reason.trim() : ""));
+    }
+
+    /**
+     * 合规强制落架：冻结单的处置出口之一。走正常落架主流程（释放档期、授信释放转应收），
+     * 事件注明合规强制；单据关闭后合规状态保留 FROZEN 留痕（关闭即冻结，不再影响任何操作）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public PostingOrder forceTakeDown(String orderNo, String operator, String reason) {
+        PostingOrder order = requireByNo(orderNo);
+        requireHung(order, "强制落架");
+        if (!LedgerEnums.COMPLIANCE_FROZEN.equals(order.getComplianceStatus())) {
+            throw new BusinessException("单据 " + order.getOrderNo() + " 不在合规冻结状态，无需强制落架，请走正常落架");
+        }
+        return doTakeDown(order, LocalDate.now(), operator,
+                "合规强制落架" + (reason != null && !reason.trim().isEmpty() ? "：" + reason.trim() : ""));
     }
 
     private String statusText(String status) {

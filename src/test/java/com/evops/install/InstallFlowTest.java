@@ -92,6 +92,7 @@ class InstallFlowTest {
         OrderCreateRequest req = new OrderCreateRequest();
         req.setSiteNo(site.getSiteNo());
         req.setCreativeName(creative);
+        req.setIndustryCategory("快消品");
         req.setOccurDate(occurDate);
         req.setOperatorName("tester");
         return orderService.createPosting(req);

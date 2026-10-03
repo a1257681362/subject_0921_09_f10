@@ -20,7 +20,7 @@
 - **外部回执**：挂回原单据；回执指向对冲单时自动回溯到根单。
 - **月度档期周历**：`/api/ledger/calendar?period=yyyy-MM` 一眼看哪块屏哪周空着。
 
-账号：演示账号 `demo / demo`，骨架账号 `bootstrap / bootstrap`（均为财务/系统视角，看全部客户、可审批）；F5 销售账号 `sales1 / sales1`、`sales2 / sales2`（只见名下客户），财务账号 `finance1 / finance1`；F6 巡查账号 `inspector1 / inspector1`（现场上报）、维护商账号 `vendor1 / vendor1`（回传处理结果），派单与复勘用 `demo / demo`；F8 安装师傅账号 `installer1 / installer1`（到场打卡、完工回传），安装派单匹配/改期用 `demo / demo`；F9 代理账号 `agent1 / agent1`、`agent2 / agent2`（只能查自己账单），代理建档挂协议/调比例/出结算用 `demo / demo` 或 `finance1 / finance1`。
+账号：演示账号 `demo / demo`，骨架账号 `bootstrap / bootstrap`（均为财务/系统视角，看全部客户、可审批）；F5 销售账号 `sales1 / sales1`、`sales2 / sales2`（只见名下客户），财务账号 `finance1 / finance1`；F6 巡查账号 `inspector1 / inspector1`（现场上报）、维护商账号 `vendor1 / vendor1`（回传处理结果），派单与复勘用 `demo / demo`；F8 安装师傅账号 `installer1 / installer1`（到场打卡、完工回传），安装派单匹配/改期用 `demo / demo`；F9 代理账号 `agent1 / agent1`、`agent2 / agent2`（只能查自己账单），代理建档挂协议/调比例/出结算用 `demo / demo` 或 `finance1 / finance1`；F10 合规岗账号 `compliance1 / compliance1`（维护受限行业名单、批量冻结与处置），名单维护与冻结处置也可用 `demo / demo`。
 
 ## F2：素材流水与多规格转档（f2-asset-transcode-1）
 
@@ -160,6 +160,22 @@
 
 代理协议模块：代理协议（点位挂代理、状态）；代理协议版本（建档/调比例/终止逐版 + 比例与有效期，下期生效、历史不重算）；代理协议状态（`ACTIVE / TERMINATED`，版本 `PENDING / EFFECTIVE / SUPERSEDED`）。
 
+## F10：受限行业类目名单（f10-restricted-category-1）
+
+漏接一单受限行业、全公司陪着做检查——这口子在系统里堵死：客户建档、上刊提交两个口都校验行业类目，命中受限名单当场拦，提示里带上依据；名单合规岗维护、调整即时生效、每次调整留操作记录；已经建档的客户后来进了名单的，在途单能批量冻结。页面和接口两头都拦，不留绕过去的道。
+
+业务口径：
+
+- **两个口当场拦，提示带依据**：客户建档必填行业类目，命中当前生效名单即拒收；上刊提交同样校验——普通单必填行业类目（快照落单），授信单取客户档案类目（占用额度之前校验，命中则单据、档期、占用整体回滚）。拦截提示含类目、受限依据、名单版本号。报价只是报价不拦，上刊必拦。
+- **行业类目落库固化、建档后不可改**：客户与上刊单上的行业类目都随档固化（授信单取客户类目快照），不提供修改接口；历史建档客户类目为空的，由合规岗/系统补录（仅空可补），补录同步回填该户在途单快照，补录成受限类目会明确提示去冻结。
+- **名单合规岗维护，调整即时生效**：名单全公司一份；调整走「另起新版（从生效版拷贝条目）→ 整表配置（类目+依据）→ 发布」，发布即时生效（拦截口径实时读生效版，无缓存），旧生效版自动置 `SUPERSEDED`；生效版不可作废，不留无名单空窗。维护与处置只认合规岗/系统（`compliance` / `system` 角色）。
+- **每次调整留操作记录**：每发一次布就是一个版本——经手人、发布时刻、调整说明、全量条目（类目+依据）随版本冻结，版本链即操作记录，永久可翻。
+- **老客户后进名单，在途单批量冻结**：发布后按新增类目（或任意指定类目集、默认生效版全量）命中「挂起中且合规状态正常」的在途单（按单上类目快照匹配，普通单/授信单通吃），一键批量冻结：原子条件更新置 `FROZEN`（重复触发、并发都幂等），逐单写 `COMPLIANCE_FREEZE` 事件，一批一记录（批次：类目集、命中客户数、单据数、经手人；逐单记录行：客户与类目快照、处置状态）。曾被同类目解冻特批的单不再重复冻结。
+- **冻结中全拦，处置只认合规**：冻结中的单落架/对冲/留痕更正/版本回退一律拒（提示联系合规岗）；处置出口两个——**解冻**（特批放行，单据恢复 `NORMAL`，事件与记录留底）、**强制落架**（走正常落架主流程释放档期与授信占用，事件注明合规强制，记录置 `FORCE_CLOSED`）。
+- **页面接口两头都拦**：前端客户建档/上刊表单带行业类目字段，页面缓存生效名单做命中即时提示与提交前拦截；服务端两个口同样硬校验，直接调接口绕不过去。
+
+类目名单模块：类目名单主档（全公司一份，当前生效版本指针）+ 名单条目（行业类目+受限依据，随版本冻结）；类目名单版本（调整另起新版、发布即时生效、旧版自动取代，经手人/发布时刻/调整说明留底，版本链即操作记录）；类目名单状态（`DRAFT 编制中 / EFFECTIVE 生效中 / SUPERSEDED 已被新版取代`）。
+
 ## 接口一览（均在 /api 下，除 health/login 外需登录）
 
 | 动作 | 接口 |
@@ -211,16 +227,21 @@
 | 中途调比例（下期生效）/ 终止 | `POST /api/agents/agreements/{agreementNo}/adjust`、`POST /api/agents/agreements/{agreementNo}/terminate` |
 | 出结算（按实际落架流水分账）/ 账单翻查 / 详情 | `POST /api/agent-settlements`、`GET /api/agent-settlements?period=&agentNo=`、`GET /api/agent-settlements/{settlementNo}` |
 | 结算汇总导出 CSV / 单张逐笔分账行导出 CSV | `GET /api/agent-settlements/export?period=yyyy-MM`、`GET /api/agent-settlements/{settlementNo}/export` |
+| 生效名单 / 版本链 / 版本详情 | `GET /api/compliance/list/effective`、`GET /api/compliance/list/versions`、`GET /api/compliance/list/versions/{versionId}` |
+| 另起新版 / 整表配置草稿 / 发布生效（合规岗） | `POST /api/compliance/list/versions`、`PUT /api/compliance/list/versions/{versionId}/items`、`POST /api/compliance/list/versions/{versionId}/publish` |
+| 冻结命中预览 / 批量冻结 / 批次翻查 / 批次明细（合规岗） | `GET /api/compliance/freeze/preview?categories=`、`POST /api/compliance/freeze`、`GET /api/compliance/freeze/batches`、`GET /api/compliance/freeze/batches/{batchNo}` |
+| 冻结单解冻 / 强制落架（合规岗） | `POST /api/compliance/orders/{orderNo}/unfreeze`、`POST /api/compliance/orders/{orderNo}/force-take-down` |
+| 历史客户行业类目补录（合规岗/系统） | `POST /api/credit/customers/{customerNo}/industry-category` |
 
 授信上刊仍走上刊接口 `POST /api/orders`，请求体带 `quoteNo`（引用已提交报价单）即为授信单；落架/对冲接口不变，撤刊即释放额度。
 
-演示界面：启动后浏览器打开根路径 `/`（周例会演示用，十三个页签覆盖全流程）。
+演示界面：启动后浏览器打开根路径 `/`（周例会演示用，十五个页签覆盖全流程）。
 
 ## 启动
 
 1. 执行 `mvn -q -DskipTests compile` 验证骨架构建。
 2. 执行 `mvn spring-boot:run` 启动应用；Spring Boot 会自动执行 `src/main/resources/schema.sql`。
 3. H2 数据文件默认写入工作区 `data/evops`。如需修改路径，编辑 `application.yml` 中的 `jdbc:h2:file:` 连接串。
-4. 验证：`mvn test`（11 项底账口径测试 + 7 项素材转档测试 + 8 项坐标建档测试 + 13 项年度刊例计价测试 + 13 项客户授信回款测试 + 10 项异常上报整改测试 + 11 项屏体播放排片测试 + 12 项安装派单资质匹配测试 + 12 项代理协议结算测试，独立内存 H2）。
+4. 验证：`mvn test`（11 项底账口径测试 + 7 项素材转档测试 + 8 项坐标建档测试 + 13 项年度刊例计价测试 + 13 项客户授信回款测试 + 10 项异常上报整改测试 + 11 项屏体播放排片测试 + 12 项安装派单资质匹配测试 + 12 项代理协议结算测试 + 2 项受限行业名单测试，独立内存 H2）。
 
 表结构交付副本：`docs/schema/evops.sql`（容器内根目录 `../../docs/schema` 不可写，交付副本置于工作区内），应与 `src/main/resources/schema.sql` 保持一致。

@@ -84,6 +84,7 @@
     <div class="tab" data-tab="playlist">⑫ 屏体播放排片</div>
     <div class="tab" data-tab="install">⑬ 安装派单资质</div>
     <div class="tab" data-tab="agent">⑭ 代理协议结算</div>
+    <div class="tab" data-tab="compliance">⑮ 受限行业名单</div>
   </div>
 
   <!-- 点位挂牌 -->
@@ -118,13 +119,14 @@
     <div class="grid">
       <div><label>点位编号 *</label><input id="postSiteNo" placeholder="已挂牌的点位编号"></div>
       <div><label>画面名称 *</label><input id="postCreative" placeholder="如 中秋档主视觉"></div>
+      <div><label>行业类目（普通单必填；授信单取客户类目）</label><input id="postIndustry" placeholder="如 快消品" oninput="clHint('postIndustry','postIndustryHint')"><div class="muted" id="postIndustryHint" style="color:#c0392b"></div></div>
       <div><label>引用报价单号（授信上刊填 QT…，留空为普通单）</label><input id="postQuoteNo" placeholder="QT…"></div>
       <div><label>上刊发生日（决定档期周/归属月）</label><input id="postDate" type="date"></div>
       <div><label>经手人（留空取登录人）</label><input id="postOperator"></div>
       <div class="span2"><label>备注</label><input id="postRemark"></div>
     </div>
     <div class="actions"><button onclick="createOrder()">开单上刊</button></div>
-    <p class="muted" style="margin-top:10px">单号由系统唯一生成（PO+序列）；同一点位同一周只能挂一张画面；归属月按发生日落死。</p>
+    <p class="muted" style="margin-top:10px">单号由系统唯一生成（PO+序列）；同一点位同一周只能挂一张画面；归属月按发生日落死。行业类目命中受限名单当场拦截（提示带依据），页面与服务端双拦。</p>
   </div>
 
   <!-- 单据翻查与动作 -->
@@ -369,11 +371,19 @@
     <h3>客户建档授信（建档即 v1 生效；客户名须与报价单客户名一致）</h3>
     <div class="grid">
       <div><label>客户名称 *</label><input id="crName"></div>
+      <div><label>行业类目 *（命中受限名单当场拦）</label><input id="crIndustry" placeholder="如 快消品" oninput="clHint('crIndustry','crIndustryHint')"><div class="muted" id="crIndustryHint" style="color:#c0392b"></div></div>
       <div><label>归属销售（财务可指定，销售默认自己）</label><input id="crOwner" placeholder="sales1"></div>
       <div><label>信用额度（含税）*</label><input id="crLimit" placeholder="50000.00"></div>
       <div><label>联系人</label><input id="crContact"></div>
       <div class="span2"><label>备注</label><input id="crRemark"></div>
       <div style="align-self:end"><button onclick="createCustomer()">建档授信</button></div>
+    </div>
+
+    <h3>历史客户类目补录（仅合规岗/系统；仅空类目可补，同步回填在途单快照）</h3>
+    <div class="grid">
+      <div><label>客户编号 *</label><input id="fillCustNo" placeholder="CU…"></div>
+      <div><label>行业类目 *</label><input id="fillIndustry"></div>
+      <div style="align-self:end"><button class="gray" onclick="fillIndustry()">补录类目</button></div>
     </div>
 
     <h3>客户翻查（销售只见名下）</h3>
@@ -719,6 +729,55 @@
     </div>
     <div id="agDetail"></div>
   </div>
+
+  <!-- 受限行业类目名单 -->
+  <div class="panel" id="panel-compliance">
+    <p class="muted">名单维护与冻结处置：合规岗 compliance1（或系统账号 demo）；客户建档、上刊提交两个口命中生效名单当场拦（提示带依据）。查看名单不限角色。</p>
+
+    <h3>当前生效名单</h3>
+    <div id="clEffective"></div>
+
+    <h3>名单调整（合规岗：另起新版 → 整表配置 → 发布即时生效）</h3>
+    <div class="actions">
+      <button onclick="clNewVersion()">另起新版（从生效版拷贝）</button>
+      <button class="gray" onclick="clLoadVersions()">刷新版本链</button>
+    </div>
+    <div class="grid" style="margin-top:8px">
+      <div><label>草稿版本号 *</label><input id="clDraftVer" placeholder="v 后面的数字，如 2"></div>
+      <div><label>发布说明（操作记录留底）</label><input id="clSummary" placeholder="如 依监管通报新增医疗美容"></div>
+    </div>
+    <div class="grid">
+      <div class="span2"><label>整表条目（每行一条：类目|受限依据）</label><textarea id="clItems" rows="6" placeholder="医疗美容|《广告法》第十六条及市场监管总局 2026 年第 12 号通报&#10;保健食品|《食品安全法》第七十三条"></textarea></div>
+    </div>
+    <div class="actions">
+      <button class="gray" onclick="clConfigure()">保存草稿条目</button>
+      <button class="warn" onclick="clPublish()">发布生效</button>
+    </div>
+    <table id="clVersionTable"></table>
+
+    <h3>批量冻结在途单（老客户后进名单的口子）</h3>
+    <div class="grid">
+      <div><label>类目集（逗号分隔，留空=生效版全量）</label><input id="clFreezeCats" placeholder="医疗美容,保健食品"></div>
+      <div><label>冻结原因</label><input id="clFreezeReason" placeholder="名单 v2 新增类目，冻结在途单"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="clFreezePreview()">命中预览</button>
+        <button class="danger" onclick="clFreeze()">批量冻结</button>
+      </div>
+    </div>
+    <div id="clPreview"></div>
+    <table id="clBatchTable"></table>
+    <div id="clBatchDetail"></div>
+
+    <h3>冻结单处置（解冻特批 / 强制落架）</h3>
+    <div class="grid">
+      <div><label>单号 *</label><input id="clOrderNo" placeholder="PO…"></div>
+      <div><label>处置原因</label><input id="clDisposeReason" placeholder="特批依据 / 强制落架说明"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="clUnfreeze()">解冻</button>
+        <button class="warn" onclick="clForceTakeDown()">强制落架</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -760,14 +819,14 @@ async function doLogin() {
   try {
     const d = await call('POST', '/login', { username: val('loginUser'), password: val('loginPass') });
     showApp(d.username); toast('登录成功，欢迎 ' + d.username, true);
-    loadSites(); loadSpecs();
+    loadSites(); loadSpecs(); clRefreshEffectiveCache();
   } catch (e) { toast(e.message); }
 }
 
 async function init() {
   // header 占位（登录后填充）
   document.body.insertAdjacentHTML('afterbegin',
-    '<header><h1>户外广告点位与上刊底账 <span class="muted" style="color:#c8d4e6">EVOPS f1·f2·f3·f4·f5·f6·f7·f8·f9</span></h1><span class="who"></span></header>');
+    '<header><h1>户外广告点位与上刊底账 <span class="muted" style="color:#c8d4e6">EVOPS f1·f2·f3·f4·f5·f6·f7·f8·f9·f10</span></h1><span class="who"></span></header>');
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
@@ -779,9 +838,10 @@ async function init() {
     if (t.dataset.tab === 'playlist') { plLoad(); }
     if (t.dataset.tab === 'install') { inLoadTeams(); inLoad(); document.getElementById('inPeriod').value = new Date().toISOString().slice(0,7); }
     if (t.dataset.tab === 'agent') { agLoadAgents(); agLoadAgreements(); agLoadSettlements(); }
+    if (t.dataset.tab === 'compliance') { clLoadEffective(); clLoadVersions(); clLoadBatches(); }
   });
   document.getElementById('calPeriod').value = new Date().toISOString().slice(0, 7);
-  try { const me = await call('GET', '/me'); showApp(me.username); loadSites(); loadSpecs(); } catch (e) { showLogin(); }
+  try { const me = await call('GET', '/me'); showApp(me.username); loadSites(); loadSpecs(); clRefreshEffectiveCache(); } catch (e) { showLogin(); }
 }
 
 async function registerSite() {
@@ -810,8 +870,12 @@ async function loadSites() {
 
 async function createOrder() {
   try {
+    if (!val('postQuoteNo')) {
+      if (!val('postIndustry')) { toast('普通上刊单必须填报行业类目（受限行业名单校验需要）'); return; }
+      if (clBlockIfRestricted(val('postIndustry'), '上刊提交')) return;
+    }
     const d = await call('POST', '/orders', { siteNo: val('postSiteNo'), creativeName: val('postCreative'),
-      quoteNo: val('postQuoteNo'),
+      quoteNo: val('postQuoteNo'), industryCategory: val('postIndustry'),
       occurDate: val('postDate'), operatorName: val('postOperator'), remark: val('postRemark') });
     toast('上刊成功，单号 ' + d.orderNo + '，档期 ' + d.weekStart + ' 至 ' + d.weekEnd + '，归属月 ' + d.bizPeriod
       + (d.creditUsed === 1 ? '，已占授信（报价 ' + d.quoteNo + '）' : ''), true);
@@ -825,13 +889,15 @@ async function loadOrders() {
       + '&siteNo=' + encodeURIComponent(val('qOrderSite')||'') + '&status=' + encodeURIComponent(val('qStatus')||'')
       + '&orderNo=' + encodeURIComponent(val('qOrderNo')||''));
     document.getElementById('orderTable').innerHTML =
-      '<tr><th>单号</th><th>种类</th><th>点位</th><th>画面</th><th>档期(周)</th><th>发生日</th><th>归属月</th><th>状态</th><th>版本</th><th>经手人</th></tr>'
+      '<tr><th>单号</th><th>种类</th><th>点位</th><th>画面</th><th>档期(周)</th><th>发生日</th><th>归属月</th><th>状态</th><th>合规</th><th>版本</th><th>经手人</th></tr>'
       + list.map(o => `<tr class="${o.status==='HUNG'?'':'closed'}">
         <td><a href="javascript:void(0)" onclick="pickOrder('${esc(o.orderNo)}')">${esc(o.orderNo)}</a></td>
         <td>${o.orderKind==='OFFSET'?'<span class="tag kind">对冲单</span>':'上刊单'}</td>
         <td>${esc(o.siteId)}</td><td>${esc(o.creativeName)}</td>
         <td>${esc(o.weekStart)} ~ ${esc(o.weekEnd)}</td><td>${esc(o.occurDate)}</td><td>${esc(o.bizPeriod)}</td>
-        <td>${statusTag(o.status)}</td><td>v${o.versionNo}</td><td>${esc(o.operatorName)}</td></tr>`).join('');
+        <td>${statusTag(o.status)}</td>
+        <td>${o.complianceStatus==='FROZEN'?'<span class="tag offset">合规冻结</span>':'正常'}</td>
+        <td>v${o.versionNo}</td><td>${esc(o.operatorName)}</td></tr>`).join('');
   } catch (e) { toast(e.message); }
 }
 function pickOrder(no) { document.getElementById('actOrderNo').value = no; toast('已填入选中单号 ' + no, true); }
@@ -1404,10 +1470,22 @@ function pickCust(no){ document.getElementById('chgCustNo').value=no; document.g
 
 async function createCustomer(){
   try{
-    await call('POST','/credit/customers',{ customerName:val('crName'), ownerSales:val('crOwner'),
+    if (!val('crIndustry')) { toast('请填行业类目（受限行业名单校验需要）'); return; }
+    if (clBlockIfRestricted(val('crIndustry'), '客户建档')) return;
+    await call('POST','/credit/customers',{ customerName:val('crName'), industryCategory:val('crIndustry'), ownerSales:val('crOwner'),
       creditLimit:val('crLimit'), contactName:val('crContact'), remark:val('crRemark') });
     toast('客户建档授信成功',true); loadCustomers();
-    ['crName','crOwner','crLimit','crContact','crRemark'].forEach(i=>document.getElementById(i).value='');
+    ['crName','crIndustry','crOwner','crLimit','crContact','crRemark'].forEach(i=>document.getElementById(i).value='');
+  }catch(e){ toast(e.message); }
+}
+async function fillIndustry(){
+  try{
+    if (!val('fillCustNo') || !val('fillIndustry')) { toast('请填客户编号与行业类目'); return; }
+    const d = await call('POST','/credit/customers/'+encodeURIComponent(val('fillCustNo'))+'/industry-category',{ industryCategory:val('fillIndustry') });
+    toast('补录成功，回填在途单 ' + d.backfilledOrders + ' 张'
+      + (d.restrictedHit ? '；注意：该类目在受限名单内，请立即批量冻结该户在途单' : ''), !d.restrictedHit);
+    if (d.restrictedHit) { toast('依据：' + d.restrictedBasis); }
+    loadCustomers();
   }catch(e){ toast(e.message); }
 }
 async function loadCustomers(){
@@ -1415,9 +1493,9 @@ async function loadCustomers(){
     const list=await call('GET','/credit/customers?keyword='+encodeURIComponent(val('qCrName')||'')
       +'&status='+encodeURIComponent(val('qCrStatus')||''));
     document.getElementById('customerTable').innerHTML=
-      '<tr><th>客户编号</th><th>客户名称</th><th>归属销售</th><th>额度</th><th>已占用</th><th>可用</th><th>状态</th><th>当前版本</th></tr>'
+      '<tr><th>客户编号</th><th>客户名称</th><th>行业类目</th><th>归属销售</th><th>额度</th><th>已占用</th><th>可用</th><th>状态</th><th>当前版本</th></tr>'
       + list.map(c=>`<tr><td><a href="javascript:void(0)" onclick="pickCust('${esc(c.customerNo)}')">${esc(c.customerNo)}</a></td>
-        <td>${esc(c.customerName)}</td><td>${esc(c.ownerSales)}</td>
+        <td>${esc(c.customerName)}</td><td>${esc(c.industryCategory||'—')}</td><td>${esc(c.ownerSales)}</td>
         <td>${money(c.creditLimit)}</td><td>${money(c.occupiedAmount)}</td>
         <td><b>${money((c.creditLimit-c.occupiedAmount).toFixed(2))}</b></td>
         <td>${crStatusTag(c.creditStatus)}</td><td>v${c.currentVersionNo}</td></tr>`).join('')
@@ -2099,6 +2177,180 @@ function agExportSummary() {
 function agExportLines() {
   if (!val('agStNo')) { toast('先填结算单号'); return; }
   window.open(API + '/agent-settlements/' + encodeURIComponent(val('agStNo')) + '/export', '_blank');
+}
+
+/* ===== F10 受限行业类目名单 ===== */
+// 生效名单前端缓存（页面预校验用；服务端仍是最终闸门）
+let clEffectiveItems = [];
+
+async function clRefreshEffectiveCache() {
+  try {
+    const d = await call('GET', '/compliance/list/effective');
+    clEffectiveItems = (d && d.items) || [];
+  } catch (e) { clEffectiveItems = []; }
+}
+function clFindRestricted(category) {
+  const name = (category || '').trim();
+  if (!name) return null;
+  return clEffectiveItems.find(i => i.categoryName === name) || null;
+}
+// 输入框即时命中提示（带依据）
+function clHint(inputId, hintId) {
+  const hit = clFindRestricted(document.getElementById(inputId).value);
+  document.getElementById(hintId).textContent = hit ? ('⚠ 该类目在受限名单内，依据：' + hit.basis) : '';
+}
+// 提交前拦截：命中名单直接 toast 拦下，不发请求
+function clBlockIfRestricted(category, scene) {
+  const hit = clFindRestricted(category);
+  if (hit) { toast('行业类目「' + hit.categoryName + '」属于受限行业，' + scene + '被拦截。依据：' + hit.basis); return true; }
+  return false;
+}
+
+function clVerTag(s) { return { DRAFT: '<span class="tag pending">编制中</span>', EFFECTIVE: '<span class="tag success">生效中</span>', SUPERSEDED: '<span class="tag">已取代</span>' }[s] || esc(s); }
+function clRecTag(s) { return { FROZEN: '<span class="tag offset">冻结中</span>', RELEASED: '<span class="tag success">已解冻</span>', FORCE_CLOSED: '<span class="tag down">强制落架</span>' }[s] || esc(s); }
+
+async function clLoadEffective() {
+  try {
+    const d = await call('GET', '/compliance/list/effective');
+    clEffectiveItems = (d && d.items) || [];
+    const v = d && d.version;
+    document.getElementById('clEffective').innerHTML =
+      (v ? `<p>名单 <b>${esc(d.list.listName)}</b>（${esc(d.list.listNo)}）当前生效版本 <b>v${v.versionNo}</b>，发布人 ${esc(v.operatorName)}，发布时刻 ${esc(v.publishTime || '')}，调整说明：${esc(v.changeSummary || '—')}</p>`
+         : '<p class="muted">名单尚未发布任何版本（全部类目放行），请合规岗另起新版发布。</p>')
+      + (clEffectiveItems.length
+        ? '<table><tr><th>行业类目</th><th>受限依据</th></tr>'
+          + clEffectiveItems.map(i => `<tr><td><b>${esc(i.categoryName)}</b></td><td>${esc(i.basis)}</td></tr>`).join('') + '</table>'
+        : '<p class="muted">当前生效名单无条目（全部类目放行）。</p>');
+  } catch (e) { toast(e.message); }
+}
+
+async function clLoadVersions() {
+  try {
+    const list = await call('GET', '/compliance/list/versions');
+    document.getElementById('clVersionTable').innerHTML =
+      '<tr><th>版本</th><th>状态</th><th>条目数</th><th>调整说明</th><th>经手人</th><th>发布时刻</th><th>操作</th></tr>'
+      + list.map(v => `<tr><td>v${v.versionNo}</td><td>${clVerTag(v.status)}</td><td>${v.itemCount}</td>
+        <td>${esc(v.changeSummary || '')}</td><td>${esc(v.operatorName)}</td><td>${esc(v.publishTime || '')}</td>
+        <td>${v.status === 'DRAFT' ? `<a href="javascript:void(0)" onclick="clPickDraft(${v.versionNo},${v.id})">接着配</a>` : `<a href="javascript:void(0)" onclick="clShowVersion(${v.id})">翻条目</a>`}</td></tr>`).join('')
+      || '<tr><td class="muted">还没有版本</td></tr>';
+  } catch (e) { toast(e.message); }
+}
+function clPickDraft(versionNo, id) { document.getElementById('clDraftVer').value = versionNo; clFillDraftItems(id); toast('已选中草稿 v' + versionNo, true); }
+async function clFillDraftItems(id) {
+  try {
+    const d = await call('GET', '/compliance/list/versions/' + id);
+    document.getElementById('clItems').value = (d.items || []).map(i => i.categoryName + '|' + i.basis).join('\n');
+  } catch (e) { toast(e.message); }
+}
+async function clShowVersion(id) {
+  try {
+    const d = await call('GET', '/compliance/list/versions/' + id);
+    toast('v' + d.version.versionNo + ' 条目：' + (d.items || []).map(i => i.categoryName).join('、') || '（空）', true);
+  } catch (e) { toast(e.message); }
+}
+
+async function clNewVersion() {
+  try {
+    const v = await call('POST', '/compliance/list/versions');
+    toast('草稿 v' + v.versionNo + ' 已就绪（已从生效版拷贝条目）', true);
+    document.getElementById('clDraftVer').value = v.versionNo;
+    clFillDraftItems(v.id); clLoadVersions();
+  } catch (e) { toast(e.message); }
+}
+function clParseItems() {
+  const lines = document.getElementById('clItems').value.split('\n').map(s => s.trim()).filter(s => s);
+  return lines.map(line => {
+    const idx = line.indexOf('|');
+    if (idx < 0) throw new Error('条目格式应为「类目|依据」：' + line);
+    return { categoryName: line.slice(0, idx).trim(), basis: line.slice(idx + 1).trim() };
+  });
+}
+async function clConfigure() {
+  const verNo = val('clDraftVer'); if (!verNo) { toast('先填草稿版本号'); return; }
+  try {
+    const list = await call('GET', '/compliance/list/versions');
+    const draft = list.find(v => v.versionNo === Number(verNo) && v.status === 'DRAFT');
+    if (!draft) { toast('版本 v' + verNo + ' 不是编制中草稿'); return; }
+    await call('PUT', '/compliance/list/versions/' + draft.id + '/items', { items: clParseItems() });
+    toast('草稿 v' + verNo + ' 条目已保存', true); clLoadVersions();
+  } catch (e) { toast(e.message); }
+}
+async function clPublish() {
+  const verNo = val('clDraftVer'); if (!verNo) { toast('先填草稿版本号'); return; }
+  try {
+    const list = await call('GET', '/compliance/list/versions');
+    const draft = list.find(v => v.versionNo === Number(verNo) && v.status === 'DRAFT');
+    if (!draft) { toast('版本 v' + verNo + ' 不是编制中草稿'); return; }
+    const r = await call('POST', '/compliance/list/versions/' + draft.id + '/publish', { changeSummary: val('clSummary') });
+    toast('名单 v' + r.version.versionNo + ' 已发布生效。新增受限类目 ' + (r.addedCategories.length ? r.addedCategories.join('、') : '无')
+      + '；移出 ' + (r.removedCategories.length ? r.removedCategories.join('、') : '无'), true);
+    if (r.addedCategories.length) {
+      document.getElementById('clFreezeCats').value = r.addedCategories.join(',');
+      toast('新增类目已填入冻结类目集，建议立即「命中预览 → 批量冻结」在途单', true);
+    }
+    clLoadEffective(); clLoadVersions();
+  } catch (e) { toast(e.message); }
+}
+
+async function clFreezePreview() {
+  try {
+    const d = await call('GET', '/compliance/freeze/preview?categories=' + encodeURIComponent(val('clFreezeCats') || ''));
+    document.getElementById('clPreview').innerHTML =
+      `<p>命中在途单 <b>${d.orderCount}</b> 张，涉及客户 <b>${d.customerCount}</b> 户。</p>`
+      + (d.orders && d.orders.length
+        ? '<table><tr><th>单号</th><th>客户</th><th>行业类目</th><th>画面</th><th>档期(周)</th><th>经手人</th></tr>'
+          + d.orders.map(o => `<tr><td>${esc(o.orderNo)}</td><td>${esc(o.customerName)}</td><td>${esc(o.industryCategory)}</td>
+            <td>${esc(o.creativeName)}</td><td>${esc(o.weekStart)} ~ ${esc(o.weekEnd)}</td><td>${esc(o.operatorName)}</td></tr>`).join('') + '</table>'
+        : '<p class="muted">没有可冻结的在途单。</p>');
+  } catch (e) { toast(e.message); }
+}
+async function clFreeze() {
+  try {
+    const cats = (val('clFreezeCats') || '').split(',').map(s => s.trim()).filter(s => s);
+    const b = await call('POST', '/compliance/freeze', { categories: cats.length ? cats : undefined, reason: val('clFreezeReason') });
+    toast('批次 ' + b.batchNo + ' 冻结完成：' + b.orderCount + ' 张单、' + b.customerCount + ' 户客户', true);
+    document.getElementById('clPreview').innerHTML = '';
+    clLoadBatches();
+  } catch (e) { toast(e.message); }
+}
+async function clLoadBatches() {
+  try {
+    const list = await call('GET', '/compliance/freeze/batches');
+    document.getElementById('clBatchTable').innerHTML =
+      '<tr><th>批次号</th><th>名单版本</th><th>类目集</th><th>客户数</th><th>单据数</th><th>原因</th><th>经手人</th><th>时间</th><th></th></tr>'
+      + list.map(b => `<tr><td>${esc(b.batchNo)}</td><td>${b.listVersionNo ? 'v' + b.listVersionNo : '—'}</td>
+        <td>${esc(b.categories)}</td><td>${b.customerCount}</td><td>${b.orderCount}</td>
+        <td>${esc(b.reason || '')}</td><td>${esc(b.operatorName)}</td><td>${esc(b.createTime)}</td>
+        <td><a href="javascript:void(0)" onclick="clBatchDetail('${esc(b.batchNo)}')">查明细</a></td></tr>`).join('')
+      || '<tr><td class="muted">还没有冻结批次</td></tr>';
+  } catch (e) { toast(e.message); }
+}
+async function clBatchDetail(batchNo) {
+  try {
+    const d = await call('GET', '/compliance/freeze/batches/' + encodeURIComponent(batchNo));
+    document.getElementById('clBatchDetail').innerHTML =
+      `<h3 style="margin-top:10px">批次 ${esc(batchNo)} 明细</h3>`
+      + '<table><tr><th>单号</th><th>客户</th><th>行业类目</th><th>处置状态</th><th>处置人</th><th>处置时刻</th><th>处置原因</th><th></th></tr>'
+      + d.records.map(r => `<tr><td>${esc(r.orderNo)}</td><td>${esc(r.customerName || '（普通单）')}</td>
+        <td>${esc(r.industryCategory)}</td><td>${clRecTag(r.status)}</td>
+        <td>${esc(r.disposeOperator || '')}</td><td>${esc(r.disposeTime || '')}</td><td>${esc(r.disposeReason || '')}</td>
+        <td><a href="javascript:void(0)" onclick="document.getElementById('clOrderNo').value='${esc(r.orderNo)}'">填入处置</a></td></tr>`).join('')
+      + '</table>';
+  } catch (e) { toast(e.message); }
+}
+async function clUnfreeze() {
+  if (!val('clOrderNo')) { toast('先填单号'); return; }
+  try {
+    await call('POST', '/compliance/orders/' + encodeURIComponent(val('clOrderNo')) + '/unfreeze', { reason: val('clDisposeReason') });
+    toast('已解冻', true); clLoadBatches();
+  } catch (e) { toast(e.message); }
+}
+async function clForceTakeDown() {
+  if (!val('clOrderNo')) { toast('先填单号'); return; }
+  try {
+    await call('POST', '/compliance/orders/' + encodeURIComponent(val('clOrderNo')) + '/force-take-down', { reason: val('clDisposeReason') });
+    toast('已强制落架', true); clLoadBatches();
+  } catch (e) { toast(e.message); }
 }
 
 init();

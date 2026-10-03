@@ -195,6 +195,7 @@ class AgentSettlementFlowTest {
     private Customer createCustomer() {
         CustomerCreateRequest req = new CustomerCreateRequest();
         req.setCustomerName(uniqueNo("代理客户"));
+        req.setIndustryCategory("快消品");
         req.setCreditLimit(new BigDecimal("9999999.00"));
         return customerService.create(req, Viewer.finance("finance1"));
     }

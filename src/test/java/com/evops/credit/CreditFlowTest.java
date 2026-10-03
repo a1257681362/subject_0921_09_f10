@@ -123,6 +123,7 @@ class CreditFlowTest {
     private Customer createCustomer(String name, String limit, Viewer owner) {
         CustomerCreateRequest req = new CustomerCreateRequest();
         req.setCustomerName(name);
+        req.setIndustryCategory("快消品");
         req.setCreditLimit(new BigDecimal(limit));
         return customerService.create(req, owner);
     }
@@ -323,6 +324,7 @@ class CreditFlowTest {
         OrderCreateRequest normal = new OrderCreateRequest();
         normal.setSiteNo(site.getSiteNo());
         normal.setCreativeName("普通画面");
+        normal.setIndustryCategory("快消品");
         normal.setOccurDate(LocalDate.of(2015, 6, 7)); // 下周
         normal.setOperatorName("tester");
         PostingOrder po = orderService.createPosting(normal);

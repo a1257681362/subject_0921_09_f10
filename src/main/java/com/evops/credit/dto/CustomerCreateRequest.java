@@ -13,6 +13,9 @@ public class CustomerCreateRequest {
     /** 客户名称，须与报价单上的客户名完全一致；全局唯一 */
     @NotBlank(message = "客户名称不能为空")
     private String customerName;
+    /** 行业类目（F10）：必填，建档时校验受限行业名单，命中当场拒收；建档后不可改 */
+    @NotBlank(message = "行业类目不能为空（受限行业名单校验需要）")
+    private String industryCategory;
     /** 归属销售账号；销售建档留空默认归当前登录销售，财务可指定 */
     private String ownerSales;
     private String contactName;

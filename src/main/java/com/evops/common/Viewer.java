@@ -19,23 +19,31 @@ public class Viewer {
     private final boolean allCustomers;
     /** 可审批额度变更（职责分离：销售只能申请） */
     private final boolean canApprove;
+    /** 可维护受限行业类目名单与处置合规冻结（合规岗/系统） */
+    private final boolean listAdmin;
 
-    private Viewer(String username, boolean allCustomers, boolean canApprove) {
+    private Viewer(String username, boolean allCustomers, boolean canApprove, boolean listAdmin) {
         this.username = username;
         this.allCustomers = allCustomers;
         this.canApprove = canApprove;
+        this.listAdmin = listAdmin;
     }
 
     public static Viewer sales(String username) {
-        return new Viewer(username, false, false);
+        return new Viewer(username, false, false, false);
     }
 
     public static Viewer finance(String username) {
-        return new Viewer(username, true, true);
+        return new Viewer(username, true, true, false);
     }
 
     public static Viewer system(String username) {
-        return new Viewer(username, true, true);
+        return new Viewer(username, true, true, true);
+    }
+
+    /** 合规岗：跨销售看全部客户（批量冻结要命中全部在途单），但不能审批额度 */
+    public static Viewer compliance(String username) {
+        return new Viewer(username, true, false, true);
     }
 
     /** 从当前 Shiro 登录主体构造视角；未登录返回 null（调用方决定如何兜底）。 */
@@ -46,8 +54,14 @@ public class Viewer {
                 return null;
             }
             String name = subject.getPrincipal().toString();
-            if (subject.hasRole("system") || subject.hasRole("finance")) {
+            if (subject.hasRole("system")) {
+                return system(name);
+            }
+            if (subject.hasRole("finance")) {
                 return finance(name);
+            }
+            if (subject.hasRole("compliance")) {
+                return compliance(name);
             }
             // 其余登录账号一律按销售视角（只看自己名下）
             return sales(name);
@@ -84,9 +98,18 @@ public class Viewer {
         }
     }
 
+    /** 名单维护与冻结处置只认合规岗/系统。 */
+    public void requireListAdmin() {
+        if (!listAdmin) {
+            throw new BusinessException("只有合规岗/系统可以维护受限行业名单与处置合规冻结");
+        }
+    }
+
     public String getUsername() { return username; }
     public boolean isAllCustomers() { return allCustomers; }
     public boolean isCanApprove() { return canApprove; }
+    /** 是否合规岗/系统（可维护名单、处置冻结） */
+    public boolean isListAdmin() { return listAdmin; }
     /** 是否销售（受限）视角 */
     public boolean isScoped() { return !allCustomers; }
 }

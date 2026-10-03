@@ -59,6 +59,7 @@ class LedgerFlowTest {
         OrderCreateRequest req = new OrderCreateRequest();
         req.setSiteNo(siteNo);
         req.setCreativeName(creative);
+        req.setIndustryCategory("快消品");
         req.setOccurDate(occurDate);
         req.setOperatorName("tester");
         return req;
@@ -121,9 +122,9 @@ class LedgerFlowTest {
         assertEquals("2026-10", oct.getBizPeriod());
         assertEquals(sep.getWeekStart(), oct.getWeekStart());
 
-        List<String> sepHits = orderService.search("2026-09", null, null, null)
+        List<String> sepHits = orderService.search("2026-09", null, null, null, null)
                 .stream().map(PostingOrder::getOrderNo).collect(Collectors.toList());
-        List<String> octHits = orderService.search("2026-10", null, null, null)
+        List<String> octHits = orderService.search("2026-10", null, null, null, null)
                 .stream().map(PostingOrder::getOrderNo).collect(Collectors.toList());
         assertTrue(sepHits.contains(sep.getOrderNo()) && !sepHits.contains(oct.getOrderNo()));
         assertTrue(octHits.contains(oct.getOrderNo()) && !octHits.contains(sep.getOrderNo()));

@@ -18,6 +18,11 @@ public class OrderCreateRequest {
      * 提交时校验并占用客户信用额度，余额不足直接拒收；留空为普通上刊单，不占额度。
      */
     private String quoteNo;
+    /**
+     * 行业类目（F10）：普通上刊单必填，提交时校验受限行业名单，命中当场拒收并快照落单；
+     * 授信上刊单留空即可，一律取客户档案类目校验并快照（填了也以客户为准）。
+     */
+    private String industryCategory;
     /** 上刊发生日，决定所在周与归属月；留空取今天 */
     private LocalDate occurDate;
     /** 经手人，留空取当前登录账号 */

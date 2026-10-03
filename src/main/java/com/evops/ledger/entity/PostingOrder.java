@@ -47,6 +47,10 @@ public class PostingOrder extends BaseEntity {
     private java.math.BigDecimal occupiedAmount;
     /** 是否占用授信：1 是 / 0 否 */
     private Integer creditUsed;
+    /** F10 行业类目快照：授信单取客户档案类目、普通单按填报，落库固化（名单校验与批量冻结都按它） */
+    private String industryCategory;
+    /** F10 合规状态：NORMAL 正常 / FROZEN 合规冻结（冻结中落架/对冲/更正/回退全拦） */
+    private String complianceStatus;
     /** F8 安装派单 id（上刊确认自动生成后回写）；普通历史单为 null */
     private Long installDispatchId;
     /** 安装派单状态镜像（PENDING/ASSIGNED/ARRIVED/COMPLETED/CANCELLED），上刊单跟着派单走 */

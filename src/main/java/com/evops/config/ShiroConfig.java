@@ -37,6 +37,8 @@ public class ShiroConfig {
         // F9：代理（只能查自己名下账单，不能挂协议/调比例/出结算）；代理协议与结算用 demo/system 或 finance1
         realm.addAccount("agent1", "agent1", "agent");
         realm.addAccount("agent2", "agent2", "agent");
+        // F10：合规岗（维护受限行业类目名单、批量冻结在途单、解冻/强制落架处置）
+        realm.addAccount("compliance1", "compliance1", "compliance");
         return realm;
     }
 

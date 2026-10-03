@@ -66,13 +66,14 @@ public class OrderController {
         return ApiResponse.ok(orderService.rollback(orderNo, request));
     }
 
-    /** 翻查：?period=yyyy-MM&siteNo=&status=&orderNo= */
+    /** 翻查：?period=yyyy-MM&siteNo=&status=&orderNo=&compliance= */
     @GetMapping
     public ApiResponse<List<PostingOrder>> search(@RequestParam(required = false) String period,
                                                   @RequestParam(required = false) String siteNo,
                                                   @RequestParam(required = false) String status,
-                                                  @RequestParam(required = false) String orderNo) {
-        return ApiResponse.ok(orderService.search(period, siteNo, status, orderNo));
+                                                  @RequestParam(required = false) String orderNo,
+                                                  @RequestParam(required = false) String compliance) {
+        return ApiResponse.ok(orderService.search(period, siteNo, status, orderNo, compliance));
     }
 
     /** 单据详情。 */

@@ -19,6 +19,8 @@ public class Customer extends BaseEntity {
     private String customerNo;
     /** 客户名称，全局唯一（报价单按它认领客户） */
     private String customerName;
+    /** 行业类目（F10）：建档必填、建档后不可改；受限名单校验与批量冻结都按它 */
+    private String industryCategory;
     /** 归属销售账号（销售只能看/操作自己名下客户） */
     private String ownerSales;
     /** 信用额度（当前生效版本后值） */

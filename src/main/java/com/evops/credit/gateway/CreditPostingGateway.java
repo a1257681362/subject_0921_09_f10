@@ -3,6 +3,7 @@ package com.evops.credit.gateway;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.evops.common.BusinessException;
 import com.evops.common.Viewer;
+import com.evops.compliance.service.CategoryListService;
 import com.evops.credit.entity.CreditOccupation;
 import com.evops.credit.entity.Customer;
 import com.evops.credit.service.CreditService;
@@ -33,17 +34,21 @@ public class CreditPostingGateway implements PostingCreditGateway {
     private final PostingOrderMapper orderMapper;
     private final CustomerService customerService;
     private final CreditService creditService;
+    /** 受限行业名单域：授信上刊提交口校验客户行业类目 */
+    private final CategoryListService categoryListService;
 
     public CreditPostingGateway(QuoteMapper quoteMapper,
                                 QuoteLineMapper quoteLineMapper,
                                 PostingOrderMapper orderMapper,
                                 CustomerService customerService,
-                                CreditService creditService) {
+                                CreditService creditService,
+                                CategoryListService categoryListService) {
         this.quoteMapper = quoteMapper;
         this.quoteLineMapper = quoteLineMapper;
         this.orderMapper = orderMapper;
         this.customerService = customerService;
         this.creditService = creditService;
+        this.categoryListService = categoryListService;
     }
 
     @Override
@@ -69,6 +74,8 @@ public class CreditPostingGateway implements PostingCreditGateway {
             throw new BusinessException("报价单客户「" + quote.getCustomerName()
                     + "」尚未建档授信，请先客户建档给额度");
         }
+        // F10 上刊提交口：客户行业类目命中受限名单当场拦（占用额度之前，失败整体回滚，单据档期都不落）
+        categoryListService.requireNotRestricted(customer.getIndustryCategory(), "上刊提交");
         // 销售只能给自己名下客户上刊占额；财务/系统不受限
         Viewer.forOperator(operatorName).checkOwn(customer.getOwnerSales());
 
@@ -80,13 +87,14 @@ public class CreditPostingGateway implements PostingCreditGateway {
             throw e;
         }
 
-        // 回写授信快照到上刊单（quote_no 唯一索引兜底一报价多单）
+        // 回写授信快照到上刊单（quote_no 唯一索引兜底一报价多单）；行业类目取客户档案快照落单
         PostingOrder patch = new PostingOrder();
         patch.setId(order.getId());
         patch.setQuoteNo(qno);
         patch.setCustomerId(customer.getId());
         patch.setOccupiedAmount(occ.getAmount());
         patch.setCreditUsed(1);
+        patch.setIndustryCategory(customer.getIndustryCategory());
         try {
             orderMapper.updateById(patch);
         } catch (DuplicateKeyException e) {
@@ -96,6 +104,7 @@ public class CreditPostingGateway implements PostingCreditGateway {
         order.setCustomerId(customer.getId());
         order.setOccupiedAmount(occ.getAmount());
         order.setCreditUsed(1);
+        order.setIndustryCategory(customer.getIndustryCategory());
     }
 
     @Override
