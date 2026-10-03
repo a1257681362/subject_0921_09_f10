@@ -1,0 +1,66 @@
+spring:
+  aop:
+    proxy-target-class: true
+  datasource:
+    url: jdbc:h2:mem:evops-test;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.evops
+  configuration:
+    map-underscore-to-camel-case: true
+
+# 素材转档测试：产物落在 target，规格与生产一致
+asset:
+  storage-root: ./target/test-assets
+  specs:
+    - name: feed_landscape
+      usage: 信息流横版
+      ratio: "16:9"
+      long-edge: 1280
+    - name: feed_portrait
+      usage: 信息流竖版
+      ratio: "9:16"
+      long-edge: 1280
+  max-file-size: 150KB
+  quality:
+    initial: 0.85
+    floor: 0.5
+    decrement: 0.15
+
+# F6 异常整改测试：照片落 target；期限 1 小时便于构造超期
+rectify:
+  storage-root: ./target/test-rectify-photos
+  deadline-hours: 1
+  escalation-scan-delay-ms: 3600000
+  escalation:
+    - after-hours: 0
+      target: 维护主管
+    - after-hours: 48
+      target: 运营经理
+    - after-hours: 120
+      target: 分管总监
+
+# F7 排片测试：自动扫描间隔拉到 1 小时，切换/锁版均由测试显式触发，保证确定性
+playlist:
+  switch-scan-delay-ms: 3600000
+  lock-scan-delay-ms: 3600000
+  friday-deadline: "18:00"
+
+# F8 安装派单测试：照片落 target；待匹配补扫拉到 1 小时，匹配由测试显式触发，保证确定性
+install:
+  storage-root: ./target/test-install-photos
+  pending-scan-delay-ms: 3600000
+  default-job-hours: 4
+  default-start-hour: 9
+
+logging:
+  level:
+    com.evops: WARN

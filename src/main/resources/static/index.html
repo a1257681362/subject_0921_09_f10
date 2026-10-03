@@ -1,0 +1,2107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>户外广告点位与上刊底账 · EVOPS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f4f5f7; color: #1f2329; font-size: 14px; }
+  header { background: #1f3a5f; color: #fff; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header .who { font-size: 13px; opacity: .85; }
+  #login { max-width: 380px; margin: 80px auto; background: #fff; border-radius: 8px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+  #login h2 { margin-bottom: 18px; font-size: 16px; }
+  #app { display: none; max-width: 1280px; margin: 0 auto; padding: 16px 24px 40px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid #e3e6eb; }
+  .tab { padding: 9px 18px; cursor: pointer; border-radius: 6px 6px 0 0; color: #555; }
+  .tab.active { background: #fff; color: #1f3a5f; font-weight: 600; border: 1px solid #e3e6eb; border-bottom: 2px solid #fff; margin-bottom: -2px; }
+  .panel { display: none; background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+  .panel.active { display: block; }
+  h3 { font-size: 15px; margin: 18px 0 10px; color: #1f3a5f; }
+  h3:first-child { margin-top: 0; }
+  label { display: block; font-size: 12px; color: #6b7280; margin: 8px 0 3px; }
+  input, select { width: 100%; padding: 7px 10px; border: 1px solid #d0d4dc; border-radius: 5px; font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 14px; }
+  .grid .span2 { grid-column: span 2; }
+  button { padding: 7px 16px; border: none; border-radius: 5px; background: #1f6fd0; color: #fff; cursor: pointer; font-size: 13px; }
+  button:hover { background: #1858a8; }
+  button.gray { background: #6b7280; }
+  button.gray:hover { background: #565d6b; }
+  button.sm { padding: 3px 9px; font-size: 12px; }
+  button.danger { background: #c0392b; }
+  button.warn { background: #d9820b; }
+  .actions { margin-top: 14px; display: flex; gap: 10px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  th, td { border: 1px solid #e3e6eb; padding: 6px 8px; text-align: left; }
+  th { background: #f0f3f7; font-weight: 600; white-space: nowrap; }
+  tr.closed td { color: #8a9099; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+  .tag.hung { background: #e8f3ff; color: #1f6fd0; }
+  .tag.down { background: #eee; color: #666; }
+  .tag.offset { background: #fdeee2; color: #c2620a; }
+  .tag.kind { background: #f3e8ff; color: #7c3aed; }
+  .tag.pending { background: #eee; color: #666; }
+  .tag.processing { background: #e8f3ff; color: #1f6fd0; }
+  .tag.success { background: #eafaf0; color: #1a8a4a; }
+  .tag.failed { background: #fdecea; color: #c0392b; }
+  .failbox { background: #fdecea; border: 1px solid #f3b4ad; color: #a5281b; border-radius: 5px; padding: 8px 10px; margin-top: 6px; font-size: 12px; white-space: pre-wrap; }
+  .cell-yes { background: #fdecea; color: #c0392b; text-align: center; cursor: default; }
+  .cell-no { background: #eafaf0; color: #1a8a4a; text-align: center; }
+  #toast { position: fixed; top: 16px; right: 16px; z-index: 99; display: flex; flex-direction: column; gap: 8px; }
+  .toast { padding: 10px 18px; border-radius: 6px; color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.15); max-width: 420px; }
+  .toast.ok { background: #1a8a4a; }
+  .toast.err { background: #c0392b; }
+  .muted { color: #8a9099; font-size: 12px; }
+  .row-actions button { margin-right: 4px; }
+  pre.event { background: #f7f8fa; border: 1px solid #e3e6eb; border-radius: 5px; padding: 10px; font-size: 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div id="login">
+  <h2>点位与上刊底账 · 登录</h2>
+  <label>用户名</label><input id="loginUser" value="demo">
+  <label>密码</label><input id="loginPass" type="password" value="demo">
+  <div class="actions"><button onclick="doLogin()">登录进入底账</button></div>
+  <p class="muted" style="margin-top:12px">演示账号 demo / demo，骨架账号 bootstrap / bootstrap</p>
+</div>
+
+<div id="app">
+  <div class="tabs">
+    <div class="tab active" data-tab="site">① 点位挂牌</div>
+    <div class="tab" data-tab="post">② 上刊</div>
+    <div class="tab" data-tab="orders">③ 单据与落架/对冲</div>
+    <div class="tab" data-tab="receipt">④ 外部回执</div>
+    <div class="tab" data-tab="calendar">⑤ 档期月历</div>
+    <div class="tab" data-tab="version">⑥ 版本与留底</div>
+    <div class="tab" data-tab="asset">⑦ 素材转档</div>
+    <div class="tab" data-tab="geo">⑧ 坐标建档与捞点</div>
+    <div class="tab" data-tab="rate">⑨ 年度刊例与报价</div>
+    <div class="tab" data-tab="credit">⑩ 客户授信与回款</div>
+    <div class="tab" data-tab="rectify">⑪ 异常上报整改</div>
+    <div class="tab" data-tab="playlist">⑫ 屏体播放排片</div>
+    <div class="tab" data-tab="install">⑬ 安装派单资质</div>
+    <div class="tab" data-tab="agent">⑭ 代理协议结算</div>
+  </div>
+
+  <!-- 点位挂牌 -->
+  <div class="panel active" id="panel-site">
+    <h3>点位建档挂牌</h3>
+    <div class="grid">
+      <div><label>点位编号 *</label><input id="siteNo" placeholder="如 BJ-WFJ-001"></div>
+      <div><label>尺寸 *</label><input id="siteSize" placeholder="如 18m×6m"></div>
+      <div><label>朝向 *</label><input id="siteOri" placeholder="如 朝北"></div>
+      <div><label>商圈 *</label><input id="siteDistrict" placeholder="如 王府井"></div>
+      <div><label>作业性质（F8 安装资质门槛）</label><select id="siteWorkType">
+        <option value="NORMAL">普通点位</option>
+        <option value="HIGH_ALTITUDE">高空点位（需高空作业证）</option>
+      </select></div>
+      <div class="span2"><label>备注</label><input id="siteRemark"></div>
+      <div><label>经手人（留空取登录人）</label><input id="siteOperator"></div>
+    </div>
+    <div class="actions"><button onclick="registerSite()">挂牌建档</button></div>
+    <h3>点位翻查</h3>
+    <div class="grid">
+      <div><label>编号（模糊）</label><input id="qSiteNo"></div>
+      <div><label>商圈（模糊）</label><input id="qDistrict"></div>
+      <div><label>朝向</label><input id="qOri"></div>
+      <div style="align-self:end"><button class="gray" onclick="loadSites()">翻查</button></div>
+    </div>
+    <table id="siteTable"></table>
+  </div>
+
+  <!-- 上刊 -->
+  <div class="panel" id="panel-post">
+    <h3>开上刊单（画面挂到点位当周档期，状态挂起）</h3>
+    <div class="grid">
+      <div><label>点位编号 *</label><input id="postSiteNo" placeholder="已挂牌的点位编号"></div>
+      <div><label>画面名称 *</label><input id="postCreative" placeholder="如 中秋档主视觉"></div>
+      <div><label>引用报价单号（授信上刊填 QT…，留空为普通单）</label><input id="postQuoteNo" placeholder="QT…"></div>
+      <div><label>上刊发生日（决定档期周/归属月）</label><input id="postDate" type="date"></div>
+      <div><label>经手人（留空取登录人）</label><input id="postOperator"></div>
+      <div class="span2"><label>备注</label><input id="postRemark"></div>
+    </div>
+    <div class="actions"><button onclick="createOrder()">开单上刊</button></div>
+    <p class="muted" style="margin-top:10px">单号由系统唯一生成（PO+序列）；同一点位同一周只能挂一张画面；归属月按发生日落死。</p>
+  </div>
+
+  <!-- 单据翻查与动作 -->
+  <div class="panel" id="panel-orders">
+    <h3>单据翻查</h3>
+    <div class="grid">
+      <div><label>归属月 yyyy-MM</label><input id="qPeriod" placeholder="2026-09"></div>
+      <div><label>点位编号</label><input id="qOrderSite"></div>
+      <div><label>状态</label><select id="qStatus"><option value="">全部</option><option value="HUNG">挂起</option><option value="TAKEN_DOWN">落架</option><option value="OFFSET">已对冲</option></select></div>
+      <div><label>单号（模糊）</label><input id="qOrderNo"></div>
+      <div style="align-self:end"><button class="gray" onclick="loadOrders()">翻查</button></div>
+    </div>
+    <table id="orderTable"></table>
+    <h3>单据操作</h3>
+    <div class="grid">
+      <div><label>目标单号</label><input id="actOrderNo"></div>
+      <div><label>发生日（落架/对冲日，留空取今天）</label><input id="actDate" type="date"></div>
+      <div><label>经手人（留空取登录人）</label><input id="actOperator"></div>
+      <div class="span2"><label id="actReasonLabel">原因/备注</label><input id="actReason"></div>
+      <div><label>更正画面名（仅“留痕更正”用）</label><input id="actCreative"></div>
+      <div><label>回退目标版本号（仅“版本回退”用）</label><input id="actVersion" type="number" min="1"></div>
+    </div>
+    <div class="actions">
+      <button class="gray" onclick="takeDown()">落架</button>
+      <button class="warn" onclick="offsetOrder()">补对冲单</button>
+      <button onclick="editOrder()">留痕更正</button>
+      <button class="danger" onclick="rollbackOrder()">版本回退</button>
+      <button class="gray" onclick="showEvents()">查事件留底</button>
+      <button class="gray" onclick="showChain()">查根单链</button>
+    </div>
+    <div id="eventBox" style="margin-top:12px;display:none"><pre class="event" id="eventContent"></pre></div>
+  </div>
+
+  <!-- 回执 -->
+  <div class="panel" id="panel-receipt">
+    <h3>外部回执挂回原单据</h3>
+    <div class="grid">
+      <div><label>回执编号 *</label><input id="rcpNo"></div>
+      <div><label>关联单号 *（上刊单/对冲单均可，自动回溯根单）</label><input id="rcpOrderNo"></div>
+      <div><label>来源</label><input id="rcpSource" placeholder="监测平台 / 业主签收"></div>
+      <div><label>回执发生日</label><input id="rcpDate" type="date"></div>
+      <div class="span2"><label>内容</label><input id="rcpContent"></div>
+      <div><label>经手人</label><input id="rcpOperator"></div>
+    </div>
+    <div class="actions"><button onclick="attachReceipt()">挂回单据</button></div>
+    <h3>按单查回执</h3>
+    <div class="grid">
+      <div><label>单号</label><input id="rcpQueryNo"></div>
+      <div style="align-self:end"><button class="gray" onclick="loadReceipts()">查回执</button></div>
+    </div>
+    <table id="receiptTable"></table>
+  </div>
+
+  <!-- 档期月历 -->
+  <div class="panel" id="panel-calendar">
+    <h3>月度档期周历（哪块屏哪周空着，一目了然）</h3>
+    <div class="grid">
+      <div><label>归属月 yyyy-MM</label><input id="calPeriod" placeholder="2026-09"></div>
+      <div><label>商圈（模糊）</label><input id="calDistrict"></div>
+      <div style="align-self:end"><button class="gray" onclick="loadCalendar()">翻查月历</button></div>
+    </div>
+    <div id="calendarBox" style="margin-top:12px;overflow:auto"></div>
+  </div>
+
+  <!-- 版本 -->
+  <div class="panel" id="panel-version">
+    <h3>起步工作区底账版本登记</h3>
+    <div class="actions"><button class="gray" onclick="loadVersions()">刷新版本</button></div>
+    <table id="versionTable"></table>
+    <h3>口径说明</h3>
+    <pre class="event">• 点位编号 / 单号 / 回执号唯一，重复存不进去（DB 唯一约束兜底）
+• 档期按 ISO 周（周一至周日），同屏同周只挂一张画面
+• 归属月按“发生日”落库固化（biz_period），跨月单不随查询日漂移
+• 改错不抹记录：原单置“已对冲”、释放档期，另补对冲单挂同一根单
+• 关闭后（落架/已对冲）的单据不能静默修改、不能回退
+• 每步动作写事件留底：经手人、发生日、事件时刻、单据快照
+• 外部回执挂回原单据；指向对冲单时回溯到根单
+• 结算流程不在本轮范围</pre>
+  </div>
+
+  <!-- 素材多规格转档 -->
+  <div class="panel" id="panel-asset">
+    <h3>原图上传 · 横竖两版常规规格自动出</h3>
+    <div class="grid">
+      <div><label>原图（JPG / PNG / GIF）*</label><input id="assetFile" type="file" accept="image/*"></div>
+      <div><label>经手人（留空取登录人）</label><input id="assetOperator"></div>
+      <div class="span2"><label>备注</label><input id="assetRemark"></div>
+    </div>
+    <div class="actions"><button onclick="uploadAsset()">上传并自动转档</button></div>
+    <p id="specHint" class="muted" style="margin-top:10px"></p>
+
+    <h3>素材档案翻查</h3>
+    <div class="grid">
+      <div><label>文件名 / 素材编号（模糊）</label><input id="qAssetKw"></div>
+      <div style="align-self:end"><button class="gray" onclick="loadAssets()">翻查</button></div>
+    </div>
+    <table id="assetTable"></table>
+
+    <div id="assetDetailBox" style="margin-top:16px;display:none">
+      <h3 id="assetDetailTitle">素材档案</h3>
+      <div id="assetJobs"></div>
+      <div id="assetVersions" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- 坐标建档与半径捞点 -->
+  <div class="panel" id="panel-geo">
+    <h3>经纬度建档（十进制度，最多 7 位小数；重录另起新版本，旧版不抹）</h3>
+    <div class="grid">
+      <div><label>点位编号 *</label><input id="geoSiteNo" placeholder="已挂牌的点位编号"></div>
+      <div><label>纬度 *</label><input id="geoLat" placeholder="如 39.9041999"></div>
+      <div><label>经度 *</label><input id="geoLng" placeholder="如 116.4073963"></div>
+      <div><label>经手人（留空取登录人）</label><input id="geoOperator"></div>
+      <div class="span2"><label>备注</label><input id="geoRemark" placeholder="如 实测纠偏"></div>
+    </div>
+    <div class="actions">
+      <button onclick="archiveGeo()">建档 / 重录</button>
+      <button class="gray" onclick="loadGeoVersions()">查建档版本</button>
+    </div>
+    <div id="geoVersionBox" style="margin-top:10px;display:none">
+      <table id="geoVersionTable"></table>
+    </div>
+
+    <h3>商圈圈界（拓展部圈的商圈落成圆心+半径，重叠带按它判定）</h3>
+    <div class="grid">
+      <div><label>商圈名 *</label><input id="dcName" placeholder="如 王府井"></div>
+      <div><label>圆心纬度 *</label><input id="dcLat"></div>
+      <div><label>圆心经度 *</label><input id="dcLng"></div>
+      <div><label>半径（公里）*</label><input id="dcRadius" placeholder="如 1.5"></div>
+      <div><label>经手人（留空取登录人）</label><input id="dcOperator"></div>
+      <div class="span2"><label>备注</label><input id="dcRemark"></div>
+    </div>
+    <div class="actions">
+      <button onclick="createDistrict()">圈定商圈</button>
+      <button class="warn" onclick="redrawDistrict()">按商圈名重圈</button>
+      <button class="gray" onclick="loadDistricts()">翻查圈界</button>
+    </div>
+    <table id="districtTable"></table>
+
+    <h3>半径捞点（给个坐标、给个公里数，圈里在营点位按距离排好）</h3>
+    <div class="grid">
+      <div><label>圆心纬度 *</label><input id="qLat"></div>
+      <div><label>圆心经度 *</label><input id="qLng"></div>
+      <div><label>半径（公里）*</label><input id="qRadius" placeholder="如 2"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="searchGeo()">捞点位</button>
+        <button onclick="exportGeo()">整页导出 CSV</button>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:6px">落在 ≥2 个商圈圈界里的点位标「重叠带」；归属仍按录入时定的主商圈走。未建档坐标的点位不进结果。</p>
+    <table id="geoHitTable"></table>
+  </div>
+
+  <!-- 年度刊例与统一报价 -->
+  <div class="panel" id="panel-rate">
+    <h3>年度刊例建档（一个自然年一份；同年重复建存不进去）</h3>
+    <div class="grid">
+      <div><label>刊例年份 *</label><input id="rcYear" placeholder="如 2026"></div>
+      <div><label>刊例名称 *</label><input id="rcName" placeholder="如 2026 年度户外 LED 刊例"></div>
+      <div><label>税率（留空默认 6%）</label><input id="rcTax" placeholder="0.06"></div>
+      <div><label>经手人（留空取登录人）</label><input id="rcOperator"></div>
+    </div>
+    <div class="actions">
+      <button onclick="createRateCard()">建年度刊例（带 v1 草稿）</button>
+      <button class="gray" onclick="loadRateCards()">翻查刊例</button>
+    </div>
+    <table id="rateCardTable"></table>
+
+    <h3>刊例版本（调价只准另起新版；生效版冻结，发布后档位/单价一个字不能改）</h3>
+    <div class="grid">
+      <div><label>刊例 ID *（翻查后点「选」）</label><input id="rcCardId"></div>
+      <div><label>草稿版本 ID（配置/发布用）</label><input id="rcVersionId"></div>
+      <div style="align-self:end;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="gray" onclick="loadVersions()">查版本</button>
+        <button onclick="newVersion()">另起新版（拷贝上版配置）</button>
+        <button class="warn" onclick="closeCard()">封存年度</button>
+      </div>
+    </div>
+    <table id="versionTable"></table>
+
+    <h3>草稿版本配置（整表替换：阶梯档位比例 + 点位刊例价；只准改草稿）</h3>
+    <div class="grid">
+      <div><label>版本 ID *</label><input id="cfgVersionId"></div>
+    </div>
+    <div class="grid">
+      <div class="span2"><label>阶梯档位（按周数升序，首尾相接不许断档；maxWeeks 留空 = 及以上，只能在最后一档）</label>
+        <textarea id="cfgTiers" rows="4" style="width:100%"></textarea></div>
+      <div class="span2"><label>点位刊例价（挂牌周单价，未税）</label>
+        <textarea id="cfgPrices" rows="4" style="width:100%"></textarea></div>
+    </div>
+    <div class="actions">
+      <button onclick="configureVersion()">保存配置到草稿</button>
+      <button class="gray" onclick="fillCfgExample()">填示例</button>
+      <button onclick="publishVersion()">发布该草稿</button>
+      <button class="warn" onclick="revokeVersion()">作废生效版本</button>
+    </div>
+
+    <h3>财务随查随拉 · 年度阶梯对照表（含税/未税口径按版本税率算）</h3>
+    <div class="grid">
+      <div><label>刊例年份 *</label><input id="rcQueryYear"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="loadYearDetail()">拉对照表</button>
+        <button onclick="exportTiers()">导出 CSV</button>
+      </div>
+    </div>
+    <div id="tierBox" style="margin-top:8px"></div>
+    <table id="rcSitePriceTable"></table>
+
+    <h3>报价试算 / 提交（按提交当天的生效刊例算；含税、未税并列，默认含税）</h3>
+    <div class="grid">
+      <div><label>客户名称 *</label><input id="qtCustomer"></div>
+      <div><label>提交日期（留空=今天，不许未来）</label><input id="qtDate" type="date"></div>
+      <div><label>经手人（留空取登录人）</label><input id="qtOperator"></div>
+      <div class="span2"><label>报价行（点位 + 购买周数；价格由刊例算，前端给价无效）</label>
+        <textarea id="qtLines" rows="3" style="width:100%"></textarea></div>
+    </div>
+    <div class="actions">
+      <button class="gray" onclick="previewQuote()">试算（不落库）</button>
+      <button onclick="submitQuote()">提交报价（留单价快照）</button>
+      <button class="gray" onclick="fillQuoteExample()">填示例</button>
+    </div>
+    <div id="quotePreview" style="margin-top:8px"></div>
+
+    <h3>报价单翻查（调价后旧单不回写，永远是提交当时的单价快照）</h3>
+    <div class="grid">
+      <div><label>客户（模糊）</label><input id="qQtCustomer"></div>
+      <div><label>刊例年份</label><input id="qQtYear"></div>
+      <div><label>报价单号（精确查详情）</label><input id="qQtNo" placeholder="QT…"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="loadQuotes()">翻查列表</button>
+        <button class="gray" onclick="loadQuoteDetail()">查单详情</button>
+      </div>
+    </div>
+    <table id="quoteTable"></table>
+    <div id="quoteDetail" style="margin-top:8px"></div>
+  </div>
+
+  <!-- 客户授信与回款 -->
+  <div class="panel" id="panel-credit">
+    <p class="muted">演示账号：财务/系统 demo、bootstrap（看全部、可审批）；销售 sales1、sales2（只见名下客户，只能申请）。</p>
+
+    <h3>客户建档授信（建档即 v1 生效；客户名须与报价单客户名一致）</h3>
+    <div class="grid">
+      <div><label>客户名称 *</label><input id="crName"></div>
+      <div><label>归属销售（财务可指定，销售默认自己）</label><input id="crOwner" placeholder="sales1"></div>
+      <div><label>信用额度（含税）*</label><input id="crLimit" placeholder="50000.00"></div>
+      <div><label>联系人</label><input id="crContact"></div>
+      <div class="span2"><label>备注</label><input id="crRemark"></div>
+      <div style="align-self:end"><button onclick="createCustomer()">建档授信</button></div>
+    </div>
+
+    <h3>客户翻查（销售只见名下）</h3>
+    <div class="grid">
+      <div><label>客户名（模糊）</label><input id="qCrName"></div>
+      <div><label>状态</label><select id="qCrStatus"><option value="">全部</option><option value="ACTIVE">在档</option><option value="FROZEN">冻结</option></select></div>
+      <div style="align-self:end"><button class="gray" onclick="loadCustomers()">翻查</button></div>
+    </div>
+    <table id="customerTable"></table>
+
+    <h3>额度变更申请（ADJUST 调额 / FREEZE 冻结 / UNFREEZE 解冻，走财务审批）</h3>
+    <div class="grid">
+      <div><label>客户编号 *</label><input id="chgCustNo"></div>
+      <div><label>变更类型 *</label><select id="chgType"><option value="ADJUST">ADJUST 调额</option><option value="FREEZE">FREEZE 冻结</option><option value="UNFREEZE">UNFREEZE 解冻</option></select></div>
+      <div><label>调额后额度（ADJUST 用）</label><input id="chgAfter" placeholder="80000.00"></div>
+      <div class="span2"><label>申请原因</label><input id="chgReason"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button onclick="applyLimit()">提交申请</button>
+        <button class="gray" onclick="loadVersions()">查该户版本</button>
+      </div>
+    </div>
+    <table id="versionTable"></table>
+
+    <h3>财务审批（待审批列表）</h3>
+    <div class="actions">
+      <button class="gray" onclick="loadPending()">刷新待审批</button>
+    </div>
+    <table id="pendingTable"></table>
+    <div class="grid" style="margin-top:8px">
+      <div><label>版本 id</label><input id="apvId"></div>
+      <div class="span2"><label>审批意见</label><input id="apvComment"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button onclick="approveLimit()">通过</button>
+        <button class="warn" onclick="rejectLimit()">驳回</button>
+      </div>
+    </div>
+
+    <h3>回款登记与按单核销（部分回款分次核）</h3>
+    <div class="grid">
+      <div><label>客户编号 *</label><input id="payCustNo"></div>
+      <div><label>实收金额 *</label><input id="payAmount" placeholder="1060.00"></div>
+      <div><label>到账日（留空今天）</label><input id="payDate" type="date"></div>
+      <div><label>银行流水/收据号</label><input id="payVoucher"></div>
+      <div style="align-self:end"><button onclick="registerPayment()">登记回款</button></div>
+    </div>
+    <div class="grid">
+      <div><label>回款凭证号（留空自动挑）</label><input id="woPayNo"></div>
+      <div><label>上刊单号 *</label><input id="woOrderNo"></div>
+      <div><label>本次核销额 *</label><input id="woAmount"></div>
+      <div><label>核销日（留空今天）</label><input id="woDate" type="date"></div>
+      <div style="align-self:end"><button class="gray" onclick="writeoff()">按单核销</button></div>
+    </div>
+
+    <h3>占用 / 应收明细</h3>
+    <div class="grid">
+      <div><label>归属月 yyyy-MM</label><input id="ocPeriod" placeholder="2031-06"></div>
+      <div><label>客户编号</label><input id="ocCustNo"></div>
+      <div><label>占用状态</label><select id="ocStatus"><option value="">全部</option><option value="ACTIVE">占用中</option><option value="RELEASED">已撤刊转应收</option><option value="REVERSED">已对冲</option></select></div>
+      <div><label>核销状态</label><select id="ocSettle"><option value="">全部</option><option value="UNSETTLED">未核销</option><option value="PARTIAL">部分核销</option><option value="SETTLED">已结清</option></select></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="loadOccupations()">翻查</button>
+        <button class="gray" onclick="exportOccupation()">导出当月 CSV</button>
+      </div>
+    </div>
+    <table id="occupationTable"></table>
+  </div>
+
+  <div class="panel" id="panel-rectify">
+    <h3>巡查现场上报异常（点位、类型必填，照片可传可不传）</h3>
+    <div class="grid">
+      <div><label>点位编号 *</label><input id="rfSiteNo" placeholder="先在①挂牌的点位"></div>
+      <div><label>异常类型 *</label><select id="rfType"></select></div>
+      <div class="span2"><label>异常情况（哪块牌面、翘边数量）</label><input id="rfDesc" placeholder="上周三大风，三块牌面翘边"></div>
+      <div><label>上报人（留空取登录人）</label><input id="rfReporter"></div>
+      <div><label>现场照片（可不选，可多选）</label><input id="rfPhotos" type="file" accept="image/*" multiple></div>
+      <div style="align-self:end"><button onclick="rfReport()">现场提交异常</button></div>
+    </div>
+
+    <h3>整改单翻查 / 处理</h3>
+    <div class="grid">
+      <div><label>状态</label><select id="rfQStatus">
+        <option value="">全部</option>
+        <option value="REPORTED">已上报待派单</option>
+        <option value="DISPATCHED">已派单整改中</option>
+        <option value="REPAIRED">已回传待复勘</option>
+        <option value="CLOSED">已销项</option>
+      </select></div>
+      <div><label>点位编号</label><input id="rfQSite"></div>
+      <div><label>异常类型</label><select id="rfQType"></select></div>
+      <div><label>关键字（单号/点位）</label><input id="rfQKeyword"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="rfLoad()">翻查</button>
+        <button class="gray" onclick="rfScan()">立即扫描超期抄送</button>
+      </div>
+    </div>
+    <table id="rfTable"></table>
+
+    <h3>操作区（从上方列表点「选」填单号，或手输）</h3>
+    <div class="grid">
+      <div><label>整改单号 *</label><input id="rfNo"></div>
+    </div>
+    <div class="grid">
+      <div><label>承派维护商 *（派单）</label><input id="rfVendor" placeholder="顺风维护商"></div>
+      <div><label>联系方式</label><input id="rfVendorContact"></div>
+      <div><label>期限小时（留空走默认 48h）</label><input id="rfDeadlineH" type="number" min="1"></div>
+      <div style="align-self:end"><button onclick="rfDispatch()">系统派单</button></div>
+    </div>
+    <div class="grid">
+      <div class="span2"><label>处理结果 *（维护商回传）</label><input id="rfRepairResult" placeholder="更换翘边牌面、加固压条"></div>
+      <div><label>整改后照片（可多选）</label><input id="rfRepairPhotos" type="file" accept="image/*" multiple></div>
+      <div style="align-self:end"><button onclick="rfRepair()">维护商回传</button></div>
+    </div>
+    <div class="grid">
+      <div class="span2"><label>复勘意见（驳回必填原因）</label><input id="rfComment" placeholder="现场复勘合格 / 南侧第三块仍翘边，返工"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button onclick="rfPass()">复勘通过销项</button>
+        <button class="warn" onclick="rfReject()">不通过退回重处理</button>
+      </div>
+    </div>
+
+    <h3>单据档案（事件版本留底 · 留证照片 · 超期抄送）</h3>
+    <div class="actions">
+      <button class="gray" onclick="rfDetail()">查档案</button>
+      <span class="muted">照片在销项关闭前不许删；关闭后删除也留事件。</span>
+    </div>
+    <div id="rfDetail"></div>
+
+    <h3>点位历史异常</h3>
+    <div class="grid">
+      <div><label>点位编号 *</label><input id="rfHistSite"></div>
+      <div style="align-self:end"><button class="gray" onclick="rfHistory()">翻该点位历史异常</button></div>
+    </div>
+    <table id="rfHistTable"></table>
+  </div>
+
+  <!-- ⑫ 屏体播放排片 -->
+  <div class="panel" id="panel-playlist">
+    <h3>给一块屏开播放列表（一屏一条，按 ISO 周编排）</h3>
+    <div class="grid">
+      <div><label>屏（点位编号） *</label><input id="plSiteNo" placeholder="已挂牌的点位编号"></div>
+      <div><label>首个编排周（周内任意一天）</label><input id="plCreateWeek" type="date"></div>
+      <div><label>经手人</label><input id="plOperator"></div>
+      <div style="align-self:end"><button onclick="plCreate()">建立播放列表</button></div>
+    </div>
+
+    <h3>按日期时段编排播放单（素材从素材库挑，跨零点自动切自然日）</h3>
+    <div class="grid">
+      <div><label>播放列表号 *</label><input id="plNo" placeholder="PL…"></div>
+      <div><label>编排周（周内任意一天）</label><input id="plWeek" type="date"></div>
+    </div>
+    <p class="muted">整表 JSON 提交（替换式，每次保存留一个新版本）。时段 endTime ≤ startTime 即跨零点；示例：</p>
+    <pre class="event" id="plSlotsDraft" style="min-height:120px"></pre>
+    <div class="actions">
+      <button onclick="plSave()">保存编排（留版本）</button>
+      <button class="gray" onclick="plLock()">人工锁版该周</button>
+      <button class="gray" onclick="plSchedule()">看该周编排</button>
+    </div>
+
+    <h3>整段复制 / 整段顺延</h3>
+    <div class="grid">
+      <div><label>复制来源周</label><input id="plCopyFrom" type="date"></div>
+      <div><label>复制目标周（留空=下周）</label><input id="plCopyTo" type="date"></div>
+      <div style="align-self:end"><button class="gray" onclick="plCopy()">整段复制</button></div>
+      <div><label>顺延分钟（正延后/负提前）</label><input id="plShiftMin" type="number" placeholder="如 30 / -60"></div>
+      <div style="align-self:end"><button class="gray" onclick="plShift()">整段顺延该周</button></div>
+    </div>
+
+    <h3>锁版后改单（走审批；用 finance1 登录审批，申请人不能审自己）</h3>
+    <div class="grid">
+      <div><label>改单周</label><input id="plChangeWeek" type="date"></div>
+      <div><label>改单原因 *</label><input id="plChangeReason" placeholder="客户临时换画"></div>
+      <div style="align-self:end"><button class="warn" onclick="plChange()">提交改单申请</button></div>
+      <div style="align-self:end"><button class="gray" onclick="plPending()">刷待审批</button></div>
+    </div>
+    <table id="plPendingTable"></table>
+
+    <h3>到点切换 / 告警（切换失败不静默，告警幂等）</h3>
+    <div class="actions">
+      <button class="gray" onclick="plScanSwitch()">立即跑一轮到点切换</button>
+      <button class="gray" onclick="plScanLock()">跑一轮周五自动锁版</button>
+      <button class="gray" onclick="plDetail()">查全量档案</button>
+    </div>
+    <table id="plListTable"></table>
+    <div id="plDetail"></div>
+  </div>
+
+  <!-- ⑬ 安装派单与资质匹配 -->
+  <div class="panel" id="panel-install">
+    <h3>安装队建档 / 资质登记（高空作业证是高空点位硬门槛，到期当日有效、次日过期）</h3>
+    <div class="grid">
+      <div><label>队名 *</label><input id="inTeamName" placeholder="先锋安装队"></div>
+      <div><label>队长 *</label><input id="inLeader"></div>
+      <div><label>联系方式</label><input id="inContact"></div>
+      <div style="align-self:end"><button onclick="inCreateTeam()">建档安装队</button></div>
+    </div>
+    <div class="grid">
+      <div><label>安装队编号 *（给哪队登记资质）</label><input id="inCertTeam"></div>
+      <div><label>资质类型 *</label><select id="inCertType">
+        <option value="WORK_AT_HEIGHT">高空作业证</option>
+        <option value="ELECTRICIAN">电工作业证</option>
+        <option value="SAFETY_OTHER">其他安全证</option>
+      </select></div>
+      <div><label>证书编号 *（全局唯一）</label><input id="inCertNo"></div>
+      <div><label>证书名称（持证人）</label><input id="inCertName"></div>
+      <div><label>发证日</label><input id="inIssueDate" type="date"></div>
+      <div><label>到期日 *（当日仍有效）</label><input id="inExpiryDate" type="date"></div>
+      <div style="align-self:end"><button class="gray" onclick="inRegisterCert()">登记资质</button></div>
+    </div>
+    <div class="actions"><button class="gray" onclick="inLoadTeams()">翻查安装队</button></div>
+    <table id="inTeamTable"></table>
+
+    <h3>安装派单翻查（上刊单确认后自动生成；待匹配可补扫或人工补匹配）</h3>
+    <div class="grid">
+      <div><label>状态</label><select id="inQStatus">
+        <option value="">全部</option>
+        <option value="PENDING">待匹配</option>
+        <option value="ASSIGNED">已派单</option>
+        <option value="ARRIVED">已到场打卡</option>
+        <option value="COMPLETED">已完工</option>
+        <option value="CANCELLED">已取消</option>
+      </select></div>
+      <div><label>安装队编号</label><input id="inQTeam"></div>
+      <div><label>点位编号</label><input id="inQSite"></div>
+      <div><label>关键字（派单号/上刊单号）</label><input id="inQKeyword"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="inLoad()">翻查</button>
+        <button class="gray" onclick="inScan()">立即补扫待匹配</button>
+      </div>
+    </div>
+    <table id="inTable"></table>
+
+    <h3>操作区（从上方列表点「选」填派单号，或手输）</h3>
+    <div class="grid">
+      <div><label>派单号 *</label><input id="inNo"></div>
+    </div>
+    <div class="grid">
+      <div><label>指定安装队编号（人工补匹配）</label><input id="inMatchTeam"></div>
+      <div><label>计划开始（留空用当前档期）</label><input id="inMatchStart" type="datetime-local"></div>
+      <div><label>计划结束</label><input id="inMatchEnd" type="datetime-local"></div>
+      <div style="align-self:end"><button onclick="inMatch()">人工补匹配</button></div>
+    </div>
+    <div class="grid">
+      <div><label>改期开始 *</label><input id="inNewStart" type="datetime-local"></div>
+      <div><label>改期结束 *</label><input id="inNewEnd" type="datetime-local"></div>
+      <div class="span2"><label>改期原因（通知到队）</label><input id="inReason" placeholder="客户场地周三才让进场"></div>
+      <div style="align-self:end"><button class="warn" onclick="inReschedule()">改期并通知队</button></div>
+    </div>
+    <div class="grid">
+      <div><label>到场打卡照片 *（必传）</label><input id="inArrivePhotos" type="file" accept="image/*" multiple></div>
+      <div style="align-self:end"><button onclick="inArrive()">师傅到场拍照打卡</button></div>
+      <div class="span2"><label>完工回执内容 *</label><input id="inFinishResult" placeholder="画面安装到位，加固压条，通电正常"></div>
+      <div><label>完工照片（可选）</label><input id="inFinishPhotos" type="file" accept="image/*" multiple></div>
+      <div style="align-self:end"><button onclick="inComplete()">完工回传回执</button></div>
+    </div>
+
+    <h3>派单档案（事件版本 · 到场/完工照片 · 回执 · 改期通知）</h3>
+    <div class="actions"><button class="gray" onclick="inDetail()">查档案</button></div>
+    <div id="inDetail"></div>
+
+    <h3>月末按队完工量 / 准时率（结算认这个数）</h3>
+    <div class="grid">
+      <div><label>归属期间 yyyy-MM</label><input id="inPeriod" type="month"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="inReport()">出报表</button>
+        <button class="gray" onclick="inExport()">导出 CSV</button>
+      </div>
+    </div>
+    <table id="inReportTable"></table>
+  </div>
+
+  <div class="panel" id="panel-agent">
+    <p class="muted">财务/系统 demo、finance1（看全部、可挂协议/调比例/出结算）；代理 agent1、agent2（只能查自己账单）。</p>
+
+    <h3>代理建档（绑登录账号，决定“只能查自己账单”边界）</h3>
+    <div class="grid">
+      <div><label>代理名称 *（全局唯一）</label><input id="agName"></div>
+      <div><label>绑定登录账号 *（全局唯一）</label><input id="agLogin" placeholder="agent1"></div>
+      <div><label>联系人</label><input id="agContact"></div>
+      <div><label>联系电话</label><input id="agPhone"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button onclick="agCreate()">建档</button>
+        <button class="gray" onclick="agLoadAgents()">翻查代理</button>
+      </div>
+    </div>
+    <table id="agentTable"></table>
+
+    <h3>点位挂代理协议（比例 + 起始结算期定清楚）</h3>
+    <div class="grid">
+      <div><label>代理编号 *</label><input id="agAgtNo"></div>
+      <div><label>点位编号 *</label><input id="agSiteNo"></div>
+      <div><label>分账比例 *（0~1，0.15=15%）</label><input id="agRate" placeholder="0.1500"></div>
+      <div><label>起始生效期 yyyy-MM（留空当期，可未来）</label><input id="agFrom" type="month"></div>
+      <div style="align-self:end"><button onclick="agCreateAgreement()">挂协议</button></div>
+    </div>
+
+    <h3>协议翻查 / 版本链（中途调整下期生效，历史期不重算）</h3>
+    <div class="grid">
+      <div><label>代理编号</label><input id="agQAgtNo"></div>
+      <div><label>点位编号</label><input id="agQSite"></div>
+      <div><label>协议状态</label><select id="agQStatus"><option value="">全部</option><option value="ACTIVE">生效中</option><option value="TERMINATED">已终止</option></select></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="agLoadAgreements()">翻查协议</button>
+      </div>
+    </div>
+    <table id="agreementTable"></table>
+    <div class="grid" style="margin-top:8px">
+      <div><label>协议号 *（调比例/终止/查版本）</label><input id="agAgNo"></div>
+      <div><label>调整后比例（0~1）</label><input id="agNewRate" placeholder="0.2000"></div>
+      <div><label>起始期 yyyy-MM（留空下期）</label><input id="agNewFrom" type="month"></div>
+      <div class="span2"><label>原因</label><input id="agReason"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button onclick="agAdjust()">中途调比例（下期生效）</button>
+        <button class="warn" onclick="agTerminate()">终止（下期起不分账）</button>
+        <button class="gray" onclick="agLoadVersions()">查版本链</button>
+      </div>
+    </div>
+    <table id="agreementVersionTable"></table>
+
+    <h3>出结算（按当期实际落架流水，四舍五入到分，尾差标出平台兜底，对平才落单）</h3>
+    <div class="grid">
+      <div><label>结算期 yyyy-MM（留空当期，不能未来）</label><input id="agSettlePeriod" type="month"></div>
+      <div><label>只结某代理编号（留空结全部在册）</label><input id="agSettleAgt"></div>
+      <div style="align-self:end"><button onclick="agSettle()">出结算</button></div>
+    </div>
+    <pre class="event" id="agSettleResult" style="display:none"></pre>
+
+    <h3>账单翻查（代理只见自己）</h3>
+    <div class="grid">
+      <div><label>结算期 yyyy-MM</label><input id="agQPeriod" type="month"></div>
+      <div><label>代理编号（财务可指定）</label><input id="agQAgt2"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="agLoadSettlements()">翻查账单</button>
+        <button class="gray" onclick="agExportSummary()">按期导出 CSV</button>
+      </div>
+    </div>
+    <table id="settlementTable"></table>
+    <div class="grid" style="margin-top:8px">
+      <div><label>结算单号 *（查逐笔分账行/导出）</label><input id="agStNo"></div>
+      <div style="align-self:end;display:flex;gap:8px">
+        <button class="gray" onclick="agDetail()">查账单详情</button>
+        <button class="gray" onclick="agExportLines()">逐笔导出 CSV</button>
+      </div>
+    </div>
+    <div id="agDetail"></div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+let currentUser = null;
+
+function toast(msg, ok) {
+  const box = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = 'toast ' + (ok ? 'ok' : 'err');
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 4200);
+}
+
+async function call(method, url, body) {
+  const opt = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opt.body = JSON.stringify(body);
+  const resp = await fetch(API + url, opt);
+  let data = null;
+  try { data = await resp.json(); } catch (e) { /* ignore */ }
+  if (resp.status === 401) { showLogin(); throw new Error('未登录'); }
+  if (!data || !data.success) throw new Error((data && data.message) || ('请求失败 ' + resp.status));
+  return data.data;
+}
+
+function val(id) { const v = document.getElementById(id).value; return v === '' ? undefined : v; }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function statusTag(s) {
+  return { HUNG: '<span class="tag hung">挂起</span>', TAKEN_DOWN: '<span class="tag down">落架</span>',
+    OFFSET: '<span class="tag offset">已对冲</span>' }[s] || esc(s);
+}
+
+function showLogin() { document.getElementById('login').style.display = 'block'; document.getElementById('app').style.display = 'none'; }
+function showApp(u) { currentUser = u; document.getElementById('login').style.display = 'none'; document.getElementById('app').style.display = 'block';
+  document.querySelector('header .who') && (document.querySelector('header .who').textContent = '经手人：' + u); }
+
+async function doLogin() {
+  try {
+    const d = await call('POST', '/login', { username: val('loginUser'), password: val('loginPass') });
+    showApp(d.username); toast('登录成功，欢迎 ' + d.username, true);
+    loadSites(); loadSpecs();
+  } catch (e) { toast(e.message); }
+}
+
+async function init() {
+  // header 占位（登录后填充）
+  document.body.insertAdjacentHTML('afterbegin',
+    '<header><h1>户外广告点位与上刊底账 <span class="muted" style="color:#c8d4e6">EVOPS f1·f2·f3·f4·f5·f6·f7·f8·f9</span></h1><span class="who"></span></header>');
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+    if (t.dataset.tab === 'rate') { loadRateCards(); }
+    if (t.dataset.tab === 'credit') { loadCustomers(); loadPending(); }
+    if (t.dataset.tab === 'rectify') { rfLoadTypes(); rfLoad(); }
+    if (t.dataset.tab === 'playlist') { plLoad(); }
+    if (t.dataset.tab === 'install') { inLoadTeams(); inLoad(); document.getElementById('inPeriod').value = new Date().toISOString().slice(0,7); }
+    if (t.dataset.tab === 'agent') { agLoadAgents(); agLoadAgreements(); agLoadSettlements(); }
+  });
+  document.getElementById('calPeriod').value = new Date().toISOString().slice(0, 7);
+  try { const me = await call('GET', '/me'); showApp(me.username); loadSites(); loadSpecs(); } catch (e) { showLogin(); }
+}
+
+async function registerSite() {
+  try {
+    await call('POST', '/sites', { siteNo: val('siteNo'), sizeSpec: val('siteSize'), orientation: val('siteOri'),
+      businessDistrict: val('siteDistrict'), workType: val('siteWorkType') || 'NORMAL',
+      remark: val('siteRemark'), operatorName: val('siteOperator') });
+    toast('挂牌建档成功', true); ['siteNo','siteSize','siteOri','siteDistrict','siteRemark'].forEach(i => document.getElementById(i).value = '');
+    loadSites();
+  } catch (e) { toast(e.message); }
+}
+
+async function loadSites() {
+  try {
+    const list = await call('GET', '/sites?siteNo=' + encodeURIComponent(val('qSiteNo')||'')
+      + '&businessDistrict=' + encodeURIComponent(val('qDistrict')||'') + '&orientation=' + encodeURIComponent(val('qOri')||''));
+    document.getElementById('siteTable').innerHTML =
+      '<tr><th>编号</th><th>尺寸</th><th>朝向</th><th>商圈</th><th>作业性质</th><th>状态</th><th>纬度</th><th>经度</th><th>建档</th><th>挂牌经手人</th><th>挂牌时间</th></tr>'
+      + list.map(s => `<tr><td>${esc(s.siteNo)}</td><td>${esc(s.sizeSpec)}</td><td>${esc(s.orientation)}</td>
+        <td>${esc(s.businessDistrict)}</td><td>${s.workType==='HIGH_ALTITUDE'?'<span class="tag failed">高空</span>':'普通'}</td><td>已挂牌</td>
+        <td>${esc(s.lat)}</td><td>${esc(s.lng)}</td>
+        <td>${s.geoStatus === 'FILED' ? '<span class="tag success">已建档 v' + s.geoVersionNo + '</span>' : '<span class="tag pending">未建档</span>'}</td>
+        <td>${esc(s.operatorName)}</td><td>${esc(s.createTime)}</td></tr>`).join('');
+  } catch (e) { toast(e.message); }
+}
+
+async function createOrder() {
+  try {
+    const d = await call('POST', '/orders', { siteNo: val('postSiteNo'), creativeName: val('postCreative'),
+      quoteNo: val('postQuoteNo'),
+      occurDate: val('postDate'), operatorName: val('postOperator'), remark: val('postRemark') });
+    toast('上刊成功，单号 ' + d.orderNo + '，档期 ' + d.weekStart + ' 至 ' + d.weekEnd + '，归属月 ' + d.bizPeriod
+      + (d.creditUsed === 1 ? '，已占授信（报价 ' + d.quoteNo + '）' : ''), true);
+    document.getElementById('actOrderNo').value = d.orderNo;
+  } catch (e) { toast(e.message); }
+}
+
+async function loadOrders() {
+  try {
+    const list = await call('GET', '/orders?period=' + encodeURIComponent(val('qPeriod')||'')
+      + '&siteNo=' + encodeURIComponent(val('qOrderSite')||'') + '&status=' + encodeURIComponent(val('qStatus')||'')
+      + '&orderNo=' + encodeURIComponent(val('qOrderNo')||''));
+    document.getElementById('orderTable').innerHTML =
+      '<tr><th>单号</th><th>种类</th><th>点位</th><th>画面</th><th>档期(周)</th><th>发生日</th><th>归属月</th><th>状态</th><th>版本</th><th>经手人</th></tr>'
+      + list.map(o => `<tr class="${o.status==='HUNG'?'':'closed'}">
+        <td><a href="javascript:void(0)" onclick="pickOrder('${esc(o.orderNo)}')">${esc(o.orderNo)}</a></td>
+        <td>${o.orderKind==='OFFSET'?'<span class="tag kind">对冲单</span>':'上刊单'}</td>
+        <td>${esc(o.siteId)}</td><td>${esc(o.creativeName)}</td>
+        <td>${esc(o.weekStart)} ~ ${esc(o.weekEnd)}</td><td>${esc(o.occurDate)}</td><td>${esc(o.bizPeriod)}</td>
+        <td>${statusTag(o.status)}</td><td>v${o.versionNo}</td><td>${esc(o.operatorName)}</td></tr>`).join('');
+  } catch (e) { toast(e.message); }
+}
+function pickOrder(no) { document.getElementById('actOrderNo').value = no; toast('已填入选中单号 ' + no, true); }
+
+function actionBody() {
+  return { occurDate: val('actDate'), operatorName: val('actOperator'), reason: val('actReason') };
+}
+async function takeDown() {
+  try { const d = await call('POST', `/orders/${val('actOrderNo')}/take-down`, actionBody());
+    toast('已落架，单据关闭：' + d.orderNo, true); loadOrders();
+  } catch (e) { toast(e.message); }
+}
+async function offsetOrder() {
+  try { const d = await call('POST', `/orders/${val('actOrderNo')}/offset`, actionBody());
+    toast('已补对冲单 ' + d.orderNo + '，原单置已对冲并释放档期', true); loadOrders();
+  } catch (e) { toast(e.message); }
+}
+async function editOrder() {
+  try { const d = await call('POST', `/orders/${val('actOrderNo')}/edit`,
+      { creativeName: val('actCreative'), operatorName: val('actOperator') });
+    toast('更正完成，新版本 v' + d.versionNo, true); loadOrders();
+  } catch (e) { toast(e.message); }
+}
+async function rollbackOrder() {
+  try { const d = await call('POST', `/orders/${val('actOrderNo')}/rollback`,
+      { targetVersion: Number(val('actVersion')), occurDate: val('actDate'), operatorName: val('actOperator'), reason: val('actReason') });
+    toast('已回退，新版本 v' + d.versionNo, true); loadOrders();
+  } catch (e) { toast(e.message); }
+}
+async function showEvents() {
+  try {
+    const list = await call('GET', `/orders/${val('actOrderNo')}/events`);
+    document.getElementById('eventBox').style.display = 'block';
+    document.getElementById('eventContent').textContent = list.map(e =>
+      `[${e.eventTime}] ${e.eventType} v${e.versionNo} | 发生日 ${e.occurDate} | 经手人 ${e.operatorName}`
+      + (e.relatedOrderNo ? ` | 关联单 ${e.relatedOrderNo}` : '') + `\n  ${e.detail || ''}`).join('\n\n');
+  } catch (e) { toast(e.message); }
+}
+async function showChain() {
+  try {
+    const d = await call('GET', `/orders/${val('actOrderNo')}/chain`);
+    document.getElementById('eventBox').style.display = 'block';
+    document.getElementById('eventContent').textContent = '根单ID ' + d.rootOrderId + ':\n'
+      + d.orders.map(o => `${o.orderNo} [${o.orderKind}] ${o.status} v${o.versionNo} ${o.occurDate} ${o.creativeName}`).join('\n');
+  } catch (e) { toast(e.message); }
+}
+
+async function attachReceipt() {
+  try {
+    await call('POST', '/receipts', { receiptNo: val('rcpNo'), orderNo: val('rcpOrderNo'), source: val('rcpSource'),
+      content: val('rcpContent'), occurDate: val('rcpDate'), operatorName: val('rcpOperator') });
+    toast('回执已挂回原单据（根单可查）', true);
+  } catch (e) { toast(e.message); }
+}
+async function loadReceipts() {
+  try {
+    const list = await call('GET', '/receipts/order/' + encodeURIComponent(val('rcpQueryNo')));
+    document.getElementById('receiptTable').innerHTML =
+      '<tr><th>回执号</th><th>指向单号</th><th>根单号</th><th>来源</th><th>内容</th><th>发生日</th><th>接收时刻</th><th>经手人</th></tr>'
+      + list.map(r => `<tr><td>${esc(r.receiptNo)}</td><td>${esc(r.orderNo)}</td><td>${esc(r.rootOrderNo)}</td>
+        <td>${esc(r.source)}</td><td>${esc(r.content)}</td><td>${esc(r.occurDate)}</td>
+        <td>${esc(r.receivedTime)}</td><td>${esc(r.operatorName)}</td></tr>`).join('');
+  } catch (e) { toast(e.message); }
+}
+
+async function loadCalendar() {
+  try {
+    const d = await call('GET', '/ledger/calendar?period=' + encodeURIComponent(val('calPeriod'))
+      + '&businessDistrict=' + encodeURIComponent(val('calDistrict')||''));
+    let html = `<table><tr><th>点位</th><th>尺寸</th><th>朝向</th><th>商圈</th>`
+      + d.weekStarts.map(w => `<th>周始 ${esc(w)}</th>`).join('') + '</tr>';
+    html += d.sites.map(s => `<tr><td>${esc(s.siteNo)}</td><td>${esc(s.sizeSpec)}</td><td>${esc(s.orientation)}</td><td>${esc(s.businessDistrict)}</td>`
+      + s.weeks.map(w => w.occupied ? `<td class="cell-yes" title="${esc(w.orderNo)}">占<br>${esc(w.orderNo)}</td>` : '<td class="cell-no">空</td>').join('') + '</tr>').join('');
+    html += '</table>';
+    document.getElementById('calendarBox').innerHTML = html;
+  } catch (e) { toast(e.message); }
+}
+
+async function loadVersions() {
+  try {
+    const list = await call('GET', '/ledger/versions');
+    document.getElementById('versionTable').innerHTML =
+      '<tr><th>版本号</th><th>说明</th><th>登记时刻</th></tr>'
+      + list.map(v => `<tr><td>${esc(v.versionNo)}</td><td>${esc(v.description)}</td><td>${esc(v.createdAt)}</td></tr>`).join('');
+  } catch (e) { toast(e.message); }
+}
+
+/* ===== ⑦ 素材多规格转档 ===== */
+let SPEC_USAGE = {};
+let assetPollTimer = null;
+let pendingAssetId = null;
+
+function transcodeTag(s) {
+  return { PENDING: '<span class="tag pending">待处理</span>', PROCESSING: '<span class="tag processing">转档中…</span>',
+    SUCCESS: '<span class="tag success">成功</span>', FAILED: '<span class="tag failed">失败</span>' }[s] || esc(s);
+}
+function kb(n) { return n == null ? '' : (n / 1024).toFixed(1) + ' KB'; }
+function usageLabel(code) { return SPEC_USAGE[code] ? SPEC_USAGE[code] + '（' + code + '）' : code; }
+function orientLabel(o) { return { LANDSCAPE: '横图', PORTRAIT: '竖图', SQUARE: '方图' }[o] || o; }
+
+async function loadSpecs() {
+  try {
+    const cfg = await call('GET', '/assets/specs');
+    (cfg.specs || []).forEach(s => { SPEC_USAGE[s.name] = s.usage; });
+    document.getElementById('specHint').textContent =
+      '自动产出：' + (cfg.specs || []).map(s => `${s.usage} ${s.ratio} 长边≤${s.longEdge}px`).join('；')
+      + `。产物体积超 ${cfg.maxFileSizeKb}KB 再压一轮质量，首轮 ${cfg.qualityInitial}、下限 ${cfg.qualityFloor}。同一张图重复上传按文件指纹认出来，不另开档。`;
+  } catch (e) { /* 未登录等场景静默 */ }
+}
+
+async function uploadAsset() {
+  const input = document.getElementById('assetFile');
+  if (!input.files || !input.files[0]) { toast('请先选择一张原图'); return; }
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  const op = val('assetOperator'); if (op) fd.append('operatorName', op);
+  const rk = val('assetRemark'); if (rk) fd.append('remark', rk);
+  try {
+    const resp = await fetch(API + '/assets/upload', { method: 'POST', body: fd });
+    if (resp.status === 401) { showLogin(); throw new Error('未登录'); }
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.message || '上传失败');
+    const d = data.data;
+    pendingAssetId = d.asset.id;
+    if (d.deduped) {
+      toast(d.message, true);
+      document.getElementById('assetFile').value = '';
+      loadAssets();
+      loadAssetDetail(d.asset.id);
+    } else {
+      toast('上传成功，转档任务 ' + d.job.jobNo + ' 已提交，自动出横竖两版…', true);
+      document.getElementById('assetFile').value = '';
+      loadAssets();
+      pollJob(d.job.id, d.asset.id);
+    }
+  } catch (e) { toast(e.message); }
+}
+
+function pollJob(jobId, assetId) {
+  if (assetPollTimer) clearInterval(assetPollTimer);
+  const tick = async () => {
+    try {
+      const job = await call('GET', '/assets/jobs/' + jobId);
+      if (job.status === 'PENDING' || job.status === 'PROCESSING') {
+        loadAssetDetail(assetId, true);
+        return;
+      }
+      clearInterval(assetPollTimer); assetPollTimer = null;
+      if (job.status === 'SUCCESS') toast('转档成功：' + job.successCount + ' 个规格已产出', true);
+      else toast('转档失败，原因已在档案里标出：' + (job.failReason || ''), false);
+      loadAssets();
+      loadAssetDetail(assetId);
+    } catch (e) { clearInterval(assetPollTimer); assetPollTimer = null; toast(e.message); }
+  };
+  tick();
+  assetPollTimer = setInterval(tick, 800);
+}
+
+async function loadAssets() {
+  try {
+    const list = await call('GET', '/assets?keyword=' + encodeURIComponent(val('qAssetKw') || ''));
+    document.getElementById('assetTable').innerHTML =
+      '<tr><th>素材编号</th><th>文件名</th><th>原图尺寸</th><th>朝向</th><th>体积</th><th>上传次数</th><th>经手人</th><th>建档时间</th><th></th></tr>'
+      + list.map(a => `<tr>
+        <td><a href="javascript:void(0)" onclick="loadAssetDetail(${a.id})">${esc(a.assetNo)}</a></td>
+        <td>${esc(a.fileName)}</td><td>${a.width}×${a.height}</td><td>${orientLabel(a.orientation)}</td>
+        <td>${kb(a.fileSize)}</td><td>${a.uploadCount}</td><td>${esc(a.operatorName)}</td>
+        <td>${esc(a.createTime)}</td>
+        <td><button class="sm gray" onclick="loadAssetDetail(${a.id})">档案/转档状态</button></td></tr>`).join('');
+  } catch (e) { toast(e.message); }
+}
+
+async function loadAssetDetail(id, silent) {
+  try {
+    const d = await call('GET', '/assets/' + id + '/detail');
+    pendingAssetId = id;
+    document.getElementById('assetDetailBox').style.display = 'block';
+    const a = d.asset;
+    document.getElementById('assetDetailTitle').textContent =
+      '素材档案 ' + a.assetNo + ' · ' + a.fileName + '（原图 ' + a.width + '×' + a.height + '）';
+
+    document.getElementById('assetJobs').innerHTML =
+      '<table><tr><th>转档任务号</th><th>对应版本</th><th>规格</th><th>状态</th><th>产出数</th><th>失败原因</th><th>完成时刻</th><th></th></tr>'
+      + d.jobs.map(j => {
+          const ver = (d.versions || []).find(v => v.version.id === j.versionId);
+          const reason = j.status === 'FAILED'
+            ? `<div class="failbox">${esc(j.failReason || '未记录原因')}</div>` : '<span class="muted">—</span>';
+          const act = j.status === 'FAILED'
+            ? `<button class="sm warn" onclick="retryAsset(${a.id})">重新转档</button>` : '';
+          return `<tr><td>${esc(j.jobNo)}</td><td>v${ver ? ver.version.versionNo : ''}</td>
+            <td>${esc(j.specs)}</td><td>${transcodeTag(j.status)}</td><td>${j.successCount}</td>
+            <td>${reason}</td><td>${esc(j.finishedTime)}</td><td>${act}</td></tr>`;
+        }).join('') + '</table>'
+      + '<div class="actions"><button class="gray" onclick="retryAsset(' + a.id + ')">手动再跑一轮（另起新版本）</button>'
+      + '<a href="' + API + '/assets/' + a.id + '/original" target="_blank"><button class="gray" type="button" style="margin-left:8px">下载原图</button></a></div>';
+
+    document.getElementById('assetVersions').innerHTML = '<h3>转档版本与多规格产物</h3>'
+      + (d.versions || []).map(vv => {
+          const v = vv.version;
+          const src = v.source === 'RETRY' ? '重新转档' : '上传首轮';
+          const fail = v.transcodeStatus === 'FAILED' ? `<div class="failbox">失败原因：${esc(v.failReason || '')}</div>` : '';
+          const files = (vv.files || []).length
+            ? '<table><tr><th>用途</th><th>产物尺寸</th><th>长边</th><th>体积</th><th>质量轮次</th><th>最终质量</th><th></th></tr>'
+              + vv.files.map(f => `<tr><td>${esc(usageLabel(f.usage))}</td><td>${f.width}×${f.height}</td>
+                  <td>${f.longEdge}px</td><td>${kb(f.fileSize)}</td>
+                  <td>${f.qualityRound === 1 ? '首轮达标' : '第 ' + f.qualityRound + ' 轮'}</td>
+                  <td>${Math.round(f.finalQuality * 100)}%</td>
+                  <td><a href="${API}/assets/files/${f.id}/download"><button class="sm" type="button">下载</button></a></td></tr>`).join('')
+              + '</table>'
+            : '<p class="muted">本版还没有产物</p>';
+          return `<div style="border:1px solid #e3e6eb;border-radius:6px;padding:10px 12px;margin-bottom:10px">
+              <b>v${v.versionNo}</b> ${transcodeTag(v.transcodeStatus)}
+              <span class="muted">来源：${src} ｜ 经手人：${esc(v.operatorName)} ｜ ${esc(v.createTime)}</span>
+              ${fail}${files}</div>`;
+        }).join('');
+  } catch (e) { if (!silent) toast(e.message); }
+}
+
+async function retryAsset(id) {
+  try {
+    const job = await call('POST', '/assets/' + id + '/retry');
+    toast('已另起新版本重新转档，任务 ' + job.jobNo, true);
+    pollJob(job.id, id);
+  } catch (e) { toast(e.message); }
+}
+
+/* ===== ⑧ 坐标建档与半径捞点 ===== */
+function geoTag(s) {
+  return s === 'FILED' ? '<span class="tag success">已建档</span>' : '<span class="tag pending">未建档</span>';
+}
+
+async function archiveGeo() {
+  const no = val('geoSiteNo');
+  if (!no) { toast('请填点位编号'); return; }
+  try {
+    const v = await call('POST', '/sites/' + encodeURIComponent(no) + '/geo',
+      { lat: val('geoLat'), lng: val('geoLng'), operatorName: val('geoOperator'), remark: val('geoRemark') });
+    toast('建档成功：' + no + ' 坐标版本 v' + v.versionNo + '（' + (v.source === 'INITIAL' ? '首次建档' : '纠偏重录') + '）', true);
+    loadGeoVersions();
+  } catch (e) { toast(e.message); }
+}
+
+async function loadGeoVersions() {
+  const no = val('geoSiteNo');
+  if (!no) { toast('请填点位编号'); return; }
+  try {
+    const list = await call('GET', '/sites/' + encodeURIComponent(no) + '/geo/versions');
+    document.getElementById('geoVersionBox').style.display = 'block';
+    document.getElementById('geoVersionTable').innerHTML =
+      '<tr><th>版本</th><th>纬度</th><th>经度</th><th>来源</th><th>状态</th><th>经手人</th><th>建档时刻</th><th>备注</th></tr>'
+      + list.map(v => `<tr><td>v${v.versionNo}</td><td>${esc(v.lat)}</td><td>${esc(v.lng)}</td>
+        <td>${v.source === 'INITIAL' ? '首次建档' : '纠偏重录'}</td>
+        <td>${v.status === 'EFFECTIVE' ? '<span class="tag success">生效中</span>' : '<span class="tag down">已被取代</span>'}</td>
+        <td>${esc(v.operatorName)}</td><td>${esc(v.createTime)}</td><td>${esc(v.remark)}</td></tr>`).join('')
+      || '<tr><td class="muted">还没有建档记录</td></tr>';
+  } catch (e) { toast(e.message); }
+}
+
+async function createDistrict() {
+  try {
+    await call('POST', '/districts', { districtName: val('dcName'), centerLat: val('dcLat'), centerLng: val('dcLng'),
+      radiusKm: val('dcRadius'), operatorName: val('dcOperator'), remark: val('dcRemark') });
+    toast('商圈圈界已圈定', true); loadDistricts();
+  } catch (e) { toast(e.message); }
+}
+
+async function redrawDistrict() {
+  const name = val('dcName');
+  if (!name) { toast('请填要重圈的商圈名'); return; }
+  try {
+    await call('PUT', '/districts/' + encodeURIComponent(name), { districtName: name, centerLat: val('dcLat'), centerLng: val('dcLng'),
+      radiusKm: val('dcRadius'), operatorName: val('dcOperator'), remark: val('dcRemark') });
+    toast('商圈 ' + name + ' 已重圈（点位归属不动）', true); loadDistricts();
+  } catch (e) { toast(e.message); }
+}
+
+async function loadDistricts() {
+  try {
+    const list = await call('GET', '/districts');
+    document.getElementById('districtTable').innerHTML =
+      '<tr><th>商圈</th><th>圆心纬度</th><th>圆心经度</th><th>半径(km)</th><th>圈定经手人</th><th>更新时间</th><th>备注</th></tr>'
+      + list.map(d => `<tr><td>${esc(d.districtName)}</td><td>${esc(d.centerLat)}</td><td>${esc(d.centerLng)}</td>
+        <td>${esc(d.radiusKm)}</td><td>${esc(d.operatorName)}</td><td>${esc(d.updateTime || d.createTime)}</td><td>${esc(d.remark)}</td></tr>`).join('');
+  } catch (e) { toast(e.message); }
+}
+
+function geoQuery() {
+  const lat = val('qLat'), lng = val('qLng'), r = val('qRadius');
+  if (!lat || !lng || !r) { toast('圆心纬度、经度、公里数都要填'); return null; }
+  return 'lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng) + '&radiusKm=' + encodeURIComponent(r);
+}
+
+async function searchGeo() {
+  const q = geoQuery(); if (!q) return;
+  try {
+    const list = await call('GET', '/sites/geo/search?' + q);
+    document.getElementById('geoHitTable').innerHTML =
+      '<tr><th>#</th><th>点位编号</th><th>尺寸</th><th>朝向</th><th>主商圈(归属)</th><th>距离(km)</th><th>纬度</th><th>经度</th><th>重叠带</th><th>覆盖商圈</th><th>建档</th></tr>'
+      + list.map((h, i) => `<tr${h.overlap ? ' style="background:#fdeee2"' : ''}>
+        <td>${i + 1}</td><td>${esc(h.siteNo)}</td><td>${esc(h.sizeSpec)}</td><td>${esc(h.orientation)}</td>
+        <td><b>${esc(h.businessDistrict)}</b></td><td>${esc(h.distanceKm)}</td><td>${esc(h.lat)}</td><td>${esc(h.lng)}</td>
+        <td>${h.overlap ? '<span class="tag offset">重叠带</span>' : '—'}</td>
+        <td>${esc((h.coveredDistricts || []).join('、'))}</td>
+        <td>${geoTag(h.geoStatus)} v${h.geoVersionNo}</td></tr>`).join('')
+      || '<tr><td class="muted">圈里没有在营且已建档的点位</td></tr>';
+    toast('捞到 ' + list.length + ' 个在营点位，已按距离排好', true);
+  } catch (e) { toast(e.message); }
+}
+
+function exportGeo() {
+  const q = geoQuery(); if (!q) return;
+  window.open(API + '/sites/geo/search/export?' + q, '_blank');
+}
+
+/* ===== ⑨ 年度刊例与统一报价 ===== */
+function rcStatusTag(s) {
+  return { DRAFT: '<span class="tag pending">编制中</span>', EFFECTIVE: '<span class="tag success">生效中</span>',
+    CLOSED: '<span class="tag down">已封存</span>' }[s] || esc(s);
+}
+function rcVerTag(s) {
+  return { DRAFT: '<span class="tag pending">草稿</span>', EFFECTIVE: '<span class="tag success">生效中</span>',
+    SUPERSEDED: '<span class="tag kind">已被新版取代</span>', REVOKED: '<span class="tag failed">已作废</span>' }[s] || esc(s);
+}
+function money(n) { return n == null ? '' : Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+async function createRateCard() {
+  try {
+    const d = await call('POST', '/rate-cards', { rateYear: Number(val('rcYear')), cardName: val('rcName'),
+      taxRate: val('rcTax'), operatorName: val('rcOperator') });
+    toast('年度刊例已建：' + d.cardNo + '（v1 草稿，ID ' + d.id + '）', true);
+    document.getElementById('rcCardId').value = d.id;
+    loadRateCards();
+  } catch (e) { toast(e.message); }
+}
+
+async function loadRateCards() {
+  try {
+    const list = await call('GET', '/rate-cards?year=' + encodeURIComponent(val('rcYear') || ''));
+    document.getElementById('rateCardTable').innerHTML =
+      '<tr><th>刊例 ID</th><th>编号</th><th>年份</th><th>名称</th><th>状态</th><th>当前版本</th><th>操作</th></tr>'
+      + list.map(c => `<tr>
+        <td>${c.id}</td><td>${esc(c.cardNo)}</td><td>${c.rateYear}</td><td>${esc(c.cardName)}</td>
+        <td>${rcStatusTag(c.status)}</td>
+        <td>${c.currentVersionNo ? 'v' + c.currentVersionNo : '—'}</td>
+        <td><button class="sm gray" onclick="pickCard(${c.id})">选</button>
+            <button class="sm gray" onclick="document.getElementById('rcQueryYear').value=${c.rateYear};loadYearDetail()">对照表</button>
+        </td></tr>`).join('');
+  } catch (e) { toast(e.message); }
+}
+function pickCard(id) {
+  document.getElementById('rcCardId').value = id;
+  loadVersions();
+}
+
+async function loadVersions() {
+  const id = val('rcCardId');
+  if (!id) { toast('请先填刊例 ID（翻查后点「选」）'); return; }
+  try {
+    const list = await call('GET', '/rate-cards/' + id + '/versions');
+    document.getElementById('versionTable').innerHTML =
+      '<tr><th>版本 ID</th><th>版本号</th><th>状态</th><th>税率</th><th>发布时间</th><th>操作</th></tr>'
+      + list.map(v => `<tr>
+        <td>${v.id}</td><td>v${v.versionNo}</td><td>${rcVerTag(v.status)}</td>
+        <td>${Math.round(v.taxRate * 10000) / 100}%</td><td>${esc(v.publishTime || '')}</td>
+        <td><button class="sm gray" onclick="pickVersion(${v.id})">配/查</button></td>
+        </tr>`).join('')
+      || '<tr><td class="muted">该刊例还没有版本</td></tr>';
+  } catch (e) { toast(e.message); }
+}
+function pickVersion(id) {
+  document.getElementById('rcVersionId').value = id;
+  document.getElementById('cfgVersionId').value = id;
+  loadVersionDetail(id);
+}
+function fillCfgExample() {
+  document.getElementById('cfgTiers').value =
+    'minWeeks,maxWeeks,discountRate\n1,4,1.0000\n5,12,0.9000\n13,,0.8000';
+  document.getElementById('cfgPrices').value =
+    'siteNo,listPrice\n（把翻查到的点位编号填这里）,1000.00';
+  toast('已填档位示例；点位刊例价请把占位符换成真实点位编号', true);
+}
+function parseCsvish(text) {
+  return text.trim().split(/\r?\n/).map(l => l.split(',').map(x => x.trim())).filter(r => r.length && r.some(Boolean));
+}
+function buildTiers() {
+  const rows = parseCsvish(val('cfgTiers'));
+  if (!rows.length) throw new Error('阶梯档位不能为空（表头：minWeeks,maxWeeks,discountRate）');
+  const start = /minweeks/i.test(rows[0][0]) ? 1 : 0;
+  return rows.slice(start).map(r => ({
+    minWeeks: Number(r[0]), maxWeeks: r[1] === '' || r[1] == null ? null : Number(r[1]),
+    discountRate: r[2]
+  }));
+}
+function buildPrices() {
+  const rows = parseCsvish(val('cfgPrices'));
+  if (!rows.length) throw new Error('点位刊例价不能为空（表头：siteNo,listPrice）');
+  const start = /siteno/i.test(rows[0][0]) ? 1 : 0;
+  return rows.slice(start).filter(r => r[0] && !/^（/.test(r[0])).map(r => ({ siteNo: r[0], listPrice: r[1] }));
+}
+
+async function newVersion() {
+  const id = val('rcCardId');
+  if (!id) { toast('请先填刊例 ID'); return; }
+  try {
+    const v = await call('POST', '/rate-cards/' + id + '/versions', { operatorName: val('rcOperator') });
+    toast('已另起 v' + v.versionNo + ' 草稿（从上一版拷贝配置），版本 ID ' + v.id, true);
+    document.getElementById('rcVersionId').value = v.id;
+    document.getElementById('cfgVersionId').value = v.id;
+    loadVersions();
+  } catch (e) { toast(e.message); }
+}
+async function closeCard() {
+  const id = val('rcCardId');
+  if (!id) { toast('请先填刊例 ID'); return; }
+  try {
+    const d = await call('POST', '/rate-cards/' + id + '/close', { operatorName: val('rcOperator') });
+    toast('年度刊例已封存：' + d.cardNo, true); loadRateCards();
+  } catch (e) { toast(e.message); }
+}
+async function configureVersion() {
+  const id = val('cfgVersionId') || val('rcVersionId');
+  if (!id) { toast('请先填草稿版本 ID'); return; }
+  let tiers, prices;
+  try { tiers = buildTiers(); prices = buildPrices(); } catch (e) { toast(e.message); return; }
+  try {
+    await call('PUT', '/rate-cards/versions/' + id, { tiers, sitePrices: prices, operatorName: val('rcOperator') });
+    toast('配置已保存到草稿（整表替换）', true);
+    loadVersionDetail(id);
+  } catch (e) { toast(e.message); }
+}
+async function publishVersion() {
+  const id = val('cfgVersionId') || val('rcVersionId');
+  if (!id) { toast('请先填版本 ID'); return; }
+  try {
+    const v = await call('POST', '/rate-cards/versions/' + id + '/publish', { operatorName: val('rcOperator') });
+    toast('v' + v.versionNo + ' 已发布生效，旧版自动置「已被新版取代」', true);
+    loadVersions(); loadRateCards();
+  } catch (e) { toast(e.message); }
+}
+async function revokeVersion() {
+  const id = val('cfgVersionId') || val('rcVersionId');
+  if (!id) { toast('请先填版本 ID'); return; }
+  try {
+    const v = await call('POST', '/rate-cards/versions/' + id + '/revoke', { operatorName: val('rcOperator') });
+    toast('v' + v.versionNo + ' 已作废（留底不删），该年度重新发布版本后才能报价', true);
+    loadVersions(); loadRateCards();
+  } catch (e) { toast(e.message); }
+}
+async function loadVersionDetail(id) {
+  const d = await call('GET', '/rate-cards/versions/' + id);
+  document.getElementById('tierBox').innerHTML = renderVersionDetail(d);
+}
+function renderVersionDetail(d) {
+  const tiers = '<table><tr><th>档位</th><th>周数区间</th><th>档位比例</th><th>折扣</th></tr>'
+    + d.tiers.map(t => `<tr><td>第 ${t.tierNo} 档</td><td>${t.maxWeeks == null ? t.minWeeks + ' 周及以上' : (t.minWeeks === t.maxWeeks ? t.minWeeks + ' 周' : t.minWeeks + '~' + t.maxWeeks + ' 周')}</td>
+      <td>${t.discountRate}</td><td>${t.discountRate === '1.0000' ? '不打折' : (t.discountRate * 10) + ' 折'}</td></tr>`).join('') + '</table>';
+  const prices = '<table style="margin-top:8px"><tr><th>点位编号</th><th>尺寸</th><th>朝向</th><th>商圈</th><th>挂牌周单价(未税)</th></tr>'
+    + (d.sitePrices || []).map(p => `<tr><td>${esc(p.siteNo)}</td><td>${esc(p.sizeSpec)}</td><td>${esc(p.orientation)}</td>
+      <td>${esc(p.businessDistrict)}</td><td>${money(p.listPrice)}</td></tr>`).join('') + '</table>';
+  return `<p class="muted">${d.rateYear} 年 · ${esc(d.cardName)} · v${d.version.versionNo} ${rcVerTag(d.version.status)}
+    · 税率 ${Math.round(d.version.taxRate * 10000) / 100}%</p>${tiers}${prices}`;
+}
+async function loadYearDetail() {
+  const year = val('rcQueryYear');
+  if (!year) { toast('请填刊例年份'); return; }
+  try {
+    const d = await call('GET', '/rate-cards/years/' + Number(year));
+    document.getElementById('tierBox').innerHTML = renderVersionDetail(d);
+    document.getElementById('rcCardId').value = d.cardId;
+    toast('已拉取 ' + year + ' 年度当前版本对照表（v' + d.version.versionNo + '）', true);
+  } catch (e) { toast(e.message); }
+}
+function exportTiers() {
+  const year = val('rcQueryYear');
+  if (!year) { toast('请填刊例年份'); return; }
+  window.open(API + '/rate-cards/years/' + Number(year) + '/tiers/export', '_blank');
+}
+
+/* 报价 */
+function fillQuoteExample() {
+  document.getElementById('qtLines').value =
+    'siteNo,weeks\n（填点位编号）,2\n（填点位编号）,10';
+  toast('已填报价行示例，请把占位符换成真实点位编号', true);
+}
+function buildQuoteLines() {
+  const rows = parseCsvish(val('qtLines'));
+  if (!rows.length) throw new Error('报价行不能为空（表头：siteNo,weeks）');
+  const start = /siteno/i.test(rows[0][0]) ? 1 : 0;
+  return rows.slice(start).filter(r => r[0] && !/^（/.test(r[0]))
+    .map(r => ({ siteNo: r[0], weeks: Number(r[1]) }));
+}
+async function previewQuote() {
+  let lines;
+  try { lines = buildQuoteLines(); } catch (e) { toast(e.message); return; }
+  try {
+    const d = await call('POST', '/quotes/preview', makeQuoteBody(lines));
+    renderPricing(d);
+    toast('试算完成（未落库），默认看含税列，未税列并列展示', true);
+  } catch (e) { toast(e.message); }
+}
+function makeQuoteBody(lines) {
+  return { customerName: val('qtCustomer') || '试算客户', submitDate: val('qtDate') || null,
+    lines, operatorName: val('qtOperator') };
+}
+async function submitQuote() {
+  let lines;
+  try { lines = buildQuoteLines(); } catch (e) { toast(e.message); return; }
+  if (!val('qtCustomer')) { toast('请填客户名称'); return; }
+  try {
+    const d = await call('POST', '/quotes', makeQuoteBody(lines));
+    toast('报价已提交：' + d.quote.quoteNo + '（v' + d.quote.versionNo + ' 刊例，单价已快照）', true);
+    renderQuoteDetail(d);
+    loadQuotes();
+  } catch (e) { toast(e.message); }
+}
+function renderPricing(d) {
+  const head = `<p class="muted">按 ${d.priceDate} 当天生效刊例：${d.rateYear} 年 v${d.versionNo}（${esc(d.rateCardNo)}）· 税率 ${Math.round(d.taxRate * 10000) / 100}%</p>`;
+  const tbl = '<table><tr><th>点位</th><th>商圈</th><th>周数</th><th>档位</th><th>比例</th><th>挂牌单价(未税)</th><th>折后单价(未税)</th><th>未税金额</th><th>税额</th><th>含税金额</th></tr>'
+    + d.lines.map(l => `<tr><td>${esc(l.siteNo)}</td><td>${esc(l.businessDistrict)}</td><td>${l.weeks}</td>
+      <td>第 ${l.tierNo} 档</td><td>${l.discountRate}</td><td>${money(l.listPrice)}</td><td>${money(l.unitPrice)}</td>
+      <td>${money(l.amountExTax)}</td><td>${money(l.taxAmount)}</td>
+      <td><b>${money(l.amountInclTax)}</b></td></tr>`).join('')
+    + `<tr style="background:#eef4fb;font-weight:600"><td colspan="7">合计（默认含税口径）</td>
+      <td>未税 ${money(d.totalExTax)}</td><td>税 ${money(d.totalTax)}</td><td>含税 ${money(d.totalInclTax)}</td></tr></table>`;
+  document.getElementById('quotePreview').innerHTML = head + tbl;
+}
+async function loadQuotes() {
+  try {
+    const list = await call('GET', '/quotes?customerName=' + encodeURIComponent(val('qQtCustomer') || '')
+      + '&rateYear=' + encodeURIComponent(val('qQtYear') || ''));
+    document.getElementById('quoteTable').innerHTML =
+      '<tr><th>报价单号</th><th>客户</th><th>提交日</th><th>刊例</th><th>版本</th><th>未税合计</th><th>税额</th><th>含税合计</th><th>经手人</th></tr>'
+      + list.map(q => `<tr><td><a href="javascript:void(0)" onclick="document.getElementById('qQtNo').value='${esc(q.quoteNo)}';loadQuoteDetail()">${esc(q.quoteNo)}</a></td>
+        <td>${esc(q.customerName)}</td><td>${esc(q.submitDate)}</td><td>${q.rateYear} ${esc(q.rateCardNo)}</td>
+        <td>v${q.versionNo}</td><td>${money(q.totalExTax)}</td><td>${money(q.totalTax)}</td>
+        <td><b>${money(q.totalInclTax)}</b></td><td>${esc(q.operatorName)}</td></tr>`).join('')
+      || '<tr><td class="muted">没有报价单</td></tr>';
+  } catch (e) { toast(e.message); }
+}
+async function loadQuoteDetail() {
+  const no = val('qQtNo');
+  if (!no) { toast('请填报价单号'); return; }
+  try {
+    const d = await call('GET', '/quotes/' + encodeURIComponent(no));
+    renderQuoteDetail(d);
+  } catch (e) { toast(e.message); }
+}
+function renderQuoteDetail(d) {
+  const q = d.quote;
+  const head = `<p>单号 <b>${esc(q.quoteNo)}</b> ｜ 客户 ${esc(q.customerName)} ｜ 提交日 ${q.submitDate}
+    ｜ 计价刊例 ${q.rateYear} ${esc(q.rateCardNo)} v${q.versionNo} ｜ 税率 ${Math.round(q.taxRate * 10000) / 100}%
+    ｜ <span class="muted">单价为提交当时快照，后续调价不回写本单</span></p>`;
+  const tbl = '<table><tr><th>#</th><th>点位</th><th>尺寸</th><th>商圈</th><th>周数</th><th>档位</th><th>比例</th><th>挂牌单价</th><th>折后单价</th><th>未税金额</th><th>税额</th><th>含税金额</th></tr>'
+    + d.lines.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.siteNo)}</td><td>${esc(l.sizeSpec)}</td>
+      <td>${esc(l.businessDistrict)}</td><td>${l.weeks}</td><td>第 ${l.tierNo} 档</td><td>${l.discountRate}</td>
+      <td>${money(l.listPrice)}</td><td>${money(l.unitPrice)}</td><td>${money(l.amountExTax)}</td>
+      <td>${money(l.taxAmount)}</td><td><b>${money(l.amountInclTax)}</b></td></tr>`).join('')
+    + `<tr style="background:#eef4fb;font-weight:600"><td colspan="9">合计（默认含税）</td>
+      <td>${money(q.totalExTax)}</td><td>${money(q.totalTax)}</td><td>含税 ${money(q.totalInclTax)}</td></tr></table>`;
+  document.getElementById('quoteDetail').innerHTML = head + tbl;
+}
+
+// ===== F5 客户授信与回款 =====
+function crStatusTag(s){ return {ACTIVE:'<span class="tag success">在档</span>',FROZEN:'<span class="tag offset">冻结</span>'}[s]||esc(s); }
+function verTag(s){ return {PENDING:'<span class="tag pending">待审批</span>',EFFECTIVE:'<span class="tag success">生效</span>',REJECTED:'<span class="tag down">已驳回</span>',SUPERSEDED:'<span class="tag">已取代</span>'}[s]||esc(s); }
+function chgTag(s){ return {INITIAL:'建档授信',ADJUST:'额度调整',FREEZE:'冻结',UNFREEZE:'解冻'}[s]||esc(s); }
+function occTag(s){ return {ACTIVE:'<span class="tag hung">占用中</span>',RELEASED:'<span class="tag down">撤刊转应收</span>',REVERSED:'<span class="tag offset">已对冲</span>'}[s]||esc(s); }
+function settleTag(s){ return {UNSETTLED:'未核销',PARTIAL:'<span class="tag pending">部分核销</span>',SETTLED:'<span class="tag success">已结清</span>'}[s]||esc(s); }
+function pickCust(no){ document.getElementById('chgCustNo').value=no; document.getElementById('payCustNo').value=no; toast('已填客户编号 '+no,true); }
+
+async function createCustomer(){
+  try{
+    await call('POST','/credit/customers',{ customerName:val('crName'), ownerSales:val('crOwner'),
+      creditLimit:val('crLimit'), contactName:val('crContact'), remark:val('crRemark') });
+    toast('客户建档授信成功',true); loadCustomers();
+    ['crName','crOwner','crLimit','crContact','crRemark'].forEach(i=>document.getElementById(i).value='');
+  }catch(e){ toast(e.message); }
+}
+async function loadCustomers(){
+  try{
+    const list=await call('GET','/credit/customers?keyword='+encodeURIComponent(val('qCrName')||'')
+      +'&status='+encodeURIComponent(val('qCrStatus')||''));
+    document.getElementById('customerTable').innerHTML=
+      '<tr><th>客户编号</th><th>客户名称</th><th>归属销售</th><th>额度</th><th>已占用</th><th>可用</th><th>状态</th><th>当前版本</th></tr>'
+      + list.map(c=>`<tr><td><a href="javascript:void(0)" onclick="pickCust('${esc(c.customerNo)}')">${esc(c.customerNo)}</a></td>
+        <td>${esc(c.customerName)}</td><td>${esc(c.ownerSales)}</td>
+        <td>${money(c.creditLimit)}</td><td>${money(c.occupiedAmount)}</td>
+        <td><b>${money((c.creditLimit-c.occupiedAmount).toFixed(2))}</b></td>
+        <td>${crStatusTag(c.creditStatus)}</td><td>v${c.currentVersionNo}</td></tr>`).join('')
+      || '<tr><td class="muted">没有客户</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+async function applyLimit(){
+  try{
+    const no=val('chgCustNo'); if(!no){ toast('请填客户编号'); return; }
+    await call('POST','/credit/customers/'+encodeURIComponent(no)+'/applications',
+      { changeType:val('chgType'), afterLimit:val('chgAfter'), reason:val('chgReason') });
+    toast('额度变更申请已提交，待财务审批',true); loadVersions(); loadPending();
+  }catch(e){ toast(e.message); }
+}
+async function loadVersions(){
+  const no=val('chgCustNo'); if(!no){ toast('请填客户编号'); return; }
+  try{
+    const vs=await call('GET','/credit/customers/'+encodeURIComponent(no)+'/versions');
+    document.getElementById('versionTable').innerHTML=
+      '<tr><th>版本</th><th>类型</th><th>前额度</th><th>后额度</th><th>前状态</th><th>后状态</th><th>状态</th><th>申请人</th><th>审批人</th><th>意见</th></tr>'
+      + vs.map(v=>`<tr><td>v${v.versionNo}</td><td>${chgTag(v.changeType)}</td>
+        <td>${v.beforeLimit==null?'-':money(v.beforeLimit)}</td><td>${v.afterLimit==null?'-':money(v.afterLimit)}</td>
+        <td>${v.beforeStatus||'-'}</td><td>${v.afterStatus||'-'}</td><td>${verTag(v.status)}</td>
+        <td>${esc(v.applicantName)}</td><td>${esc(v.approverName)||'-'}</td><td>${esc(v.approveComment)||''}</td></tr>`).join('');
+  }catch(e){ toast(e.message); }
+}
+async function loadPending(){
+  try{
+    const vs=await call('GET','/credit/limit-versions/pending');
+    document.getElementById('pendingTable').innerHTML=
+      '<tr><th>id</th><th>客户</th><th>版本</th><th>类型</th><th>前额度</th><th>后额度</th><th>后状态</th><th>申请人</th><th>原因</th></tr>'
+      + vs.map(v=>`<tr><td><a href="javascript:void(0)" onclick="document.getElementById('apvId').value=${v.id}">${v.id}</a></td>
+        <td>${v.customerId}</td><td>v${v.versionNo}</td><td>${chgTag(v.changeType)}</td>
+        <td>${v.beforeLimit==null?'-':money(v.beforeLimit)}</td><td>${v.afterLimit==null?'-':money(v.afterLimit)}</td>
+        <td>${v.afterStatus||'-'}</td><td>${esc(v.applicantName)}</td><td>${esc(v.applyReason)||''}</td></tr>`).join('')
+      || '<tr><td class="muted">没有待审批</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+async function approveLimit(){
+  try{
+    const id=val('apvId'); if(!id){ toast('请填版本 id'); return; }
+    await call('POST','/credit/limit-versions/'+id+'/approve',{ comment:val('apvComment') });
+    toast('审批通过',true); loadPending(); loadCustomers();
+  }catch(e){ toast(e.message); }
+}
+async function rejectLimit(){
+  try{
+    const id=val('apvId'); if(!id){ toast('请填版本 id'); return; }
+    await call('POST','/credit/limit-versions/'+id+'/reject',{ comment:val('apvComment') });
+    toast('已驳回',true); loadPending();
+  }catch(e){ toast(e.message); }
+}
+async function registerPayment(){
+  try{
+    await call('POST','/credit/payments',{ customerNo:val('payCustNo'), receivedAmount:val('payAmount'),
+      receivedDate:val('payDate'), voucherNo:val('payVoucher') });
+    toast('回款登记成功',true);
+    ['payAmount','payDate','payVoucher'].forEach(i=>document.getElementById(i).value='');
+  }catch(e){ toast(e.message); }
+}
+async function writeoff(){
+  try{
+    const d=await call('POST','/credit/write-offs',{ paymentNo:val('woPayNo'), orderNo:val('woOrderNo'),
+      amount:val('woAmount'), writeoffDate:val('woDate') });
+    toast('核销成功，凭证 '+d.payment.paymentNo+' 状态 '+d.payment.status,true); loadOccupations();
+  }catch(e){ toast(e.message); }
+}
+async function loadOccupations(){
+  try{
+    const q='?customerNo='+encodeURIComponent(val('ocCustNo')||'')+'&period='+encodeURIComponent(val('ocPeriod')||'')
+      +'&status='+encodeURIComponent(val('ocStatus')||'')+'&settleStatus='+encodeURIComponent(val('ocSettle')||'');
+    const list=await call('GET','/credit/occupations'+q);
+    document.getElementById('occupationTable').innerHTML=
+      '<tr><th>归属月</th><th>客户</th><th>上刊单</th><th>报价单</th><th>点位</th><th>金额</th><th>已核销</th><th>未核销</th><th>占用状态</th><th>核销状态</th></tr>'
+      + list.map(o=>`<tr><td>${esc(o.bizPeriod)}</td><td>${esc(o.customerName)}</td>
+        <td>${esc(o.orderNo)}</td><td>${esc(o.quoteNo)}</td><td>${esc(o.siteNo)}</td>
+        <td>${money(o.amount)}</td><td>${money(o.settledAmount)}</td>
+        <td><b>${money((o.amount-o.settledAmount).toFixed(2))}</b></td>
+        <td>${occTag(o.status)}</td><td>${settleTag(o.settleStatus)}</td></tr>`).join('')
+      || '<tr><td class="muted">没有占用记录</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+function exportOccupation(){
+  const p=val('ocPeriod');
+  if(!p){ toast('请填归属月 yyyy-MM'); return; }
+  window.open('/api/credit/reports/occupation/export?period='+encodeURIComponent(p),'_blank');
+}
+
+// ===== ⑪ 异常上报整改 =====
+function rfStatusTag(s){
+  return { REPORTED:'<span class="tag pending">已上报待派单</span>',
+    DISPATCHED:'<span class="tag processing">已派单整改中</span>',
+    REPAIRED:'<span class="tag hung">已回传待复勘</span>',
+    CLOSED:'<span class="tag success">已销项</span>' }[s] || esc(s);
+}
+async function callForm(url, formData){
+  const resp = await fetch(API + url, { method:'POST', body: formData });
+  let data = null;
+  try { data = await resp.json(); } catch(e) {}
+  if (resp.status === 401) { showLogin(); throw new Error('未登录'); }
+  if (!data || !data.success) throw new Error((data && data.message) || ('请求失败 ' + resp.status));
+  return data.data;
+}
+function rfFillFiles(fd, inputId){
+  const files = document.getElementById(inputId).files;
+  for (const f of files) fd.append('photos', f);
+}
+async function rfLoadTypes(){
+  try{
+    const types = await call('GET','/rectify/types');
+    const opts = '<option value="">请选择</option>' + types.map(t=>`<option value="${t.code}">${esc(t.label)}</option>`).join('');
+    document.getElementById('rfType').innerHTML = opts;
+    document.getElementById('rfQType').innerHTML = '<option value="">全部</option>'
+      + types.map(t=>`<option value="${t.code}">${esc(t.label)}</option>`).join('');
+  }catch(e){ toast(e.message); }
+}
+async function rfReport(){
+  if(!val('rfSiteNo') || !val('rfType')){ toast('点位编号和异常类型必填'); return; }
+  const fd = new FormData();
+  fd.append('siteNo', val('rfSiteNo')); fd.append('abnormalType', val('rfType'));
+  if(val('rfDesc')) fd.append('abnormalDesc', val('rfDesc'));
+  if(val('rfReporter')) fd.append('reporterName', val('rfReporter'));
+  rfFillFiles(fd, 'rfPhotos');
+  try{
+    const d = await callForm('/rectify/orders', fd);
+    toast('异常已上报，整改单 ' + d.rectifyNo + '，状态：已上报待派单', true);
+    document.getElementById('rfNo').value = d.rectifyNo;
+    ['rfSiteNo','rfDesc','rfReporter'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('rfPhotos').value='';
+    rfLoad();
+  }catch(e){ toast(e.message); }
+}
+async function rfLoad(){
+  try{
+    const q='?status='+encodeURIComponent(val('rfQStatus')||'')+'&siteNo='+encodeURIComponent(val('rfQSite')||'')
+      +'&type='+encodeURIComponent(val('rfQType')||'')+'&keyword='+encodeURIComponent(val('rfQKeyword')||'');
+    const list=await call('GET','/rectify/orders'+q);
+    document.getElementById('rfTable').innerHTML=
+      '<tr><th>单号</th><th>点位</th><th>商圈</th><th>类型</th><th>状态</th><th>版本</th><th>上报人</th><th>维护商</th><th>期限</th><th>抄送级</th><th></th></tr>'
+      + list.map(o=>`<tr class="${o.status==='CLOSED'?'closed':''}">
+        <td>${esc(o.rectifyNo)}</td><td>${esc(o.siteNo)}</td><td>${esc(o.businessDistrict)}</td>
+        <td>${esc(rfTypeLabel(o.abnormalType))}</td><td>${rfStatusTag(o.status)}</td><td>v${o.versionNo}</td>
+        <td>${esc(o.reporterName)}</td><td>${esc(o.vendorName)||''}</td>
+        <td>${o.deadline ? esc(o.deadline.replace('T',' ')) : ''}</td><td>${o.ccLevel>0 ? '<span class="tag failed">L'+o.ccLevel+'</span>' : ''}</td>
+        <td><button class="sm gray" onclick="rfPick('${esc(o.rectifyNo)}')">选</button></td></tr>`).join('')
+      || '<tr><td class="muted">没有整改单</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+function rfTypeLabel(code){
+  return { PANEL_LIFT:'牌面翘边', PANEL_DAMAGE:'牌面破损', LIGHT_FAULT:'亮灯故障',
+    STRUCTURE_RISK:'结构隐患', OTHER:'其他异常' }[code] || code;
+}
+function rfPick(no){ document.getElementById('rfNo').value=no; toast('已填入选中单号 '+no,true); rfDetail(); }
+async function rfDispatch(){
+  if(!val('rfNo')){ toast('请填整改单号'); return; }
+  if(!val('rfVendor')){ toast('请填承派维护商'); return; }
+  try{
+    const d=await call('POST',`/rectify/orders/${encodeURIComponent(val('rfNo'))}/dispatch`,{
+      vendorName:val('rfVendor'), vendorContact:val('rfVendorContact'),
+      deadlineHours:val('rfDeadlineH')?Number(val('rfDeadlineH')):undefined });
+    toast('已派单给 '+d.vendorName+'，整改期限截止 '+String(d.deadline).replace('T',' '),true); rfLoad();
+  }catch(e){ toast(e.message); }
+}
+async function rfRepair(){
+  if(!val('rfNo')){ toast('请填整改单号'); return; }
+  if(!val('rfRepairResult')){ toast('维护商回传必须填处理结果'); return; }
+  const fd=new FormData();
+  fd.append('repairResult',val('rfRepairResult'));
+  rfFillFiles(fd,'rfRepairPhotos');
+  try{
+    await callForm(`/rectify/orders/${encodeURIComponent(val('rfNo'))}/repair`,fd);
+    toast('处理结果已回传，等待复勘',true);
+    document.getElementById('rfRepairResult').value=''; document.getElementById('rfRepairPhotos').value='';
+    rfLoad();
+  }catch(e){ toast(e.message); }
+}
+async function rfPass(){
+  if(!val('rfNo')){ toast('请填整改单号'); return; }
+  try{
+    await call('POST',`/rectify/orders/${encodeURIComponent(val('rfNo'))}/reinspect/pass`,
+      { comment:val('rfComment')||'' });
+    toast('复勘通过，已销项关闭（照片留证已冻结归档）',true); rfLoad(); rfDetail();
+  }catch(e){ toast(e.message); }
+}
+async function rfReject(){
+  if(!val('rfNo')){ toast('请填整改单号'); return; }
+  if(!val('rfComment')){ toast('驳回必须填不通过原因'); return; }
+  try{
+    const d=await call('POST',`/rectify/orders/${encodeURIComponent(val('rfNo'))}/reinspect/reject`,
+      { comment:val('rfComment') });
+    toast('已退回维护商重处理，返工期限截止 '+String(d.deadline).replace('T',' '),true);
+    document.getElementById('rfComment').value=''; rfLoad();
+  }catch(e){ toast(e.message); }
+}
+async function rfScan(){
+  try{ const d=await call('POST','/rectify/escalations/scan');
+    toast('扫描完成，本次新抄送 '+d.escalated+' 条', d.escalated>=0); rfLoad();
+  }catch(e){ toast(e.message); }
+}
+async function rfHistory(){
+  if(!val('rfHistSite')){ toast('请填点位编号'); return; }
+  try{
+    const list=await call('GET','/rectify/sites/'+encodeURIComponent(val('rfHistSite'))+'/history');
+    document.getElementById('rfHistTable').innerHTML=
+      '<tr><th>单号</th><th>类型</th><th>状态</th><th>版本</th><th>上报时间</th><th>上报人</th><th>维护商</th><th>销项时间</th></tr>'
+      + list.map(o=>`<tr class="${o.status==='CLOSED'?'closed':''}">
+        <td><a href="javascript:void(0)" onclick="rfPick('${esc(o.rectifyNo)}')">${esc(o.rectifyNo)}</a></td>
+        <td>${esc(rfTypeLabel(o.abnormalType))}</td><td>${rfStatusTag(o.status)}</td><td>v${o.versionNo}</td>
+        <td>${esc(String(o.reportTime).replace('T',' '))}</td><td>${esc(o.reporterName)}</td>
+        <td>${esc(o.vendorName)||''}</td><td>${o.closedTime?esc(String(o.closedTime).replace('T',' ')):''}</td></tr>`).join('')
+      || '<tr><td class="muted">该点位没有历史异常</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+async function rfDetail(){
+  if(!val('rfNo')){ toast('请填整改单号'); return; }
+  try{
+    const d=await call('GET','/rectify/orders/'+encodeURIComponent(val('rfNo')));
+    const o=d.order;
+    const head=`<p>单号 <b>${esc(o.rectifyNo)}</b> · 点位 ${esc(o.siteNo)} · ${esc(rfTypeLabel(o.abnormalType))}
+      · ${rfStatusTag(o.status)} · 版本 v${o.versionNo} · 抄送级 L${o.ccLevel}</p>
+      <p class="muted">上报：${esc(o.reporterName)} ${esc(String(o.reportTime).replace('T',' '))}
+      ｜派单：${esc(o.vendorName)||'-'} ${o.dispatchTime?esc(String(o.dispatchTime).replace('T',' ')):''} 期限 ${o.deadline?esc(String(o.deadline).replace('T',' ')):'-'}
+      ｜回传：${o.repairTime?esc(String(o.repairTime).replace('T',' ')):'-'}｜复勘：${o.reinspectTime?esc(String(o.reinspectTime).replace('T',' ')):'-'}</p>`;
+    const photos=(d.photos||[]).map(p=>`<li>[${p.phase==='REPORT'?'现场上报':'整改回传'}]
+        <a href="/api/rectify/photos/${p.id}/download" target="_blank">${esc(p.fileName)}</a>
+        <span class="muted">（${(p.fileSize/1024).toFixed(1)}KB，${esc(p.uploaderName)} ${esc(String(p.uploadTime).replace('T',' '))}）</span>
+        ${o.status==='CLOSED'?`<button class="sm danger" onclick="rfDeletePhoto(${p.id})">删（已关闭，留事件）</button>`:'<span class="muted">关闭前不可删</span>'}
+      </li>`).join('') || '<li class="muted">无照片（上报照片本就可传可不传）</li>';
+    const ccs=(d.ccs||[]).map(c=>`<li>L${c.ccLevel} → ${esc(c.ccTarget)}：${esc(c.reason)} <span class="muted">${esc(String(c.triggerTime).replace('T',' '))}</span></li>`).join('')
+      || '<li class="muted">未超期抄送</li>';
+    const events=(d.events||[]).map(e=>`<li><b>${esc(rfEventLabel(e.eventType))}</b> v${e.versionNo} · ${esc(e.operatorName)}
+      · ${esc(String(e.eventTime).replace('T',' '))}<br><span class="muted">${esc(e.detail)}</span></li>`).join('');
+    document.getElementById('rfDetail').innerHTML=`${head}
+      <p><b>留证照片（${(d.photos||[]).length}）</b></p><ul>${photos}</ul>
+      <p><b>超期抄送（${(d.ccs||[]).length}）</b></p><ul>${ccs}</ul>
+      <p><b>事件版本留底（${(d.events||[]).length}）</b></p><ul style="font-size:12px">${events}</ul>`;
+  }catch(e){ toast(e.message); }
+}
+function rfEventLabel(t){ return { REPORT:'现场上报', DISPATCH:'派单', REPAIR:'回传',
+  REINSPECT_PASS:'复勘通过销项', REINSPECT_REJECT:'复勘驳回返工', ESCALATE:'超期抄送', PHOTO_DELETE:'关闭后删照片' }[t]||t; }
+async function rfDeletePhoto(id){
+  try{ await call('POST','/rectify/photos/'+id+'/delete'); toast('照片已删除，已留 PHOTO_DELETE 事件',true); rfDetail(); }
+  catch(e){ toast(e.message); }
+}
+
+// ===== ⑫ 屏体播放排片 =====
+function plExample() {
+  return JSON.stringify([
+    { date: document.getElementById('plWeek').value || '2026-11-02',
+      startTime: '09:00', endTime: '10:00',
+      items: [{ assetNo: 'AS0000000001', durationSec: 15 }] }
+  ], null, 2);
+}
+function plWeekOf(id){ const v = val(id); return v ? ('&weekStart=' + v) : ''; }
+async function plLoad() {
+  document.getElementById('plSlotsDraft').textContent = plExample();
+  try {
+    const list = await call('GET', '/playlists');
+    document.getElementById('plListTable').innerHTML =
+      '<tr><th>单号</th><th>屏</th><th>状态</th><th>当前版本</th><th>在播</th><th>建单经手</th></tr>'
+      + list.map(p => `<tr><td>${esc(p.playlistNo)}</td><td>${esc(p.siteNo)}</td>
+        <td>${p.status==='LOCKED'?'<span class="tag success">已锁版</span>':'<span class="tag pending">编排中</span>'}</td>
+        <td>v${p.currentVersionNo||''}</td>
+        <td>${p.liveSwitchDate?esc(p.liveSwitchDate)+' #'+p.liveSlotSeq+'<span class="muted">（v'+(p.liveVersionId||'')+'）</span>':'<span class="muted">未上播</span>'}</td>
+        <td>${esc(p.operatorName)}</td></tr>`).join('');
+  } catch (e) { toast(e.message); }
+}
+async function plCreate() {
+  try {
+    const d = await call('POST', '/playlists', { siteNo: val('plSiteNo'), weekStart: val('plCreateWeek'), operatorName: val('plOperator') });
+    toast('播放列表已建立：' + d.playlistNo, true);
+    document.getElementById('plNo').value = d.playlistNo;
+    plLoad();
+  } catch (e) { toast(e.message); }
+}
+function plParseSlots() {
+  try { return JSON.parse(document.getElementById('plSlotsDraft').textContent); }
+  catch (e) { throw new Error('时段 JSON 解析失败：' + e.message); }
+}
+async function plSave() {
+  try {
+    const v = await call('PUT', '/playlists/'+val('plNo')+'/schedule',
+      { weekStart: val('plWeek'), slots: plParseSlots(), operatorName: val('plOperator') });
+    toast('编排已保存为 v' + v.versionNo + '（改动留版本）', true); plLoad();
+  } catch (e) { toast(e.message); }
+}
+async function plSchedule() {
+  try {
+    const d = await call('GET', '/playlists/'+val('plNo')+'/schedule'+plWeekOf('plWeek').replace('&','?'));
+    const rows = (d.slots||[]).map(s => {
+      const items = (s.items||[]).map(i => esc(i.assetNo)+(i.durationSec?('('+i.durationSec+'s)'):'')).join('、');
+      return `<tr><td>${esc(s.slotDate)}</td><td>${esc(s.startTime)}~${s.endReachMidnight?'24:00':esc(s.endTime)}</td>
+        <td>${s.crossMidnight?'<span class="tag kind">跨零点</span>':''}${s.startFromMidnight?'<span class="tag pending">次日段</span>':''}</td>
+        <td>${items}</td></tr>`;
+    }).join('');
+    document.getElementById('plDetail').innerHTML =
+      `<h3>${esc(d.weekStart)} 周编排 ${d.locked?'<span class="tag success">已锁版</span>':'<span class="tag pending">草稿</span>'}
+        （版本 v${d.version?d.version.versionNo:''}）</h3>
+      <table><tr><th>自然日</th><th>时段</th><th>标记</th><th>播放单（素材）</th></tr>${rows}</table>`;
+  } catch (e) { toast(e.message); }
+}
+async function plLock() {
+  try {
+    const v = await call('POST', '/playlists/'+val('plNo')+'/lock', { weekStart: val('plWeek'), operatorName: val('plOperator') });
+    toast('该周已锁版 v' + v.versionNo + '，之后改动走审批', true); plLoad();
+  } catch (e) { toast(e.message); }
+}
+async function plCopy() {
+  try {
+    const v = await call('POST', '/playlists/'+val('plNo')+'/segments/copy',
+      { fromWeekStart: val('plCopyFrom'), toWeekStart: val('plCopyTo'), operatorName: val('plOperator') });
+    toast('整段复制完成，目标周新草稿 v' + v.versionNo, true); plLoad();
+  } catch (e) { toast(e.message); }
+}
+async function plShift() {
+  try {
+    const v = await call('POST', '/playlists/'+val('plNo')+'/segments/shift',
+      { weekStart: val('plWeek'), offsetMinutes: Number(val('plShiftMin')), operatorName: val('plOperator') });
+    toast('整段顺延完成，新草稿 v' + v.versionNo, true); plLoad();
+  } catch (e) { toast(e.message); }
+}
+async function plChange() {
+  try {
+    const v = await call('POST', '/playlists/'+val('plNo')+'/change-requests',
+      { weekStart: val('plChangeWeek') || val('plWeek'), reason: val('plChangeReason'), slots: plParseSlots() });
+    toast('锁版改单已提交待审批（#' + v.id + '）', true); plPending();
+  } catch (e) { toast(e.message); }
+}
+async function plPending() {
+  try {
+    const list = await call('GET', '/playlists/change-requests/pending');
+    document.getElementById('plPendingTable').innerHTML =
+      '<tr><th>单号</th><th>版本</th><th>周</th><th>申请人</th><th>原因</th><th>操作</th></tr>'
+      + list.map(v => `<tr><td>${esc(v.playlistId)}</td><td>#${v.id} v${v.versionNo}</td><td>${esc(v.weekStart)}</td>
+        <td>${esc(v.applicantName)}</td><td>${esc(v.applyReason)}</td>
+        <td class="row-actions"><button class="sm" onclick="plApprove(${v.id})">通过</button>
+        <button class="sm danger" onclick="plReject(${v.id})">驳回</button></td></tr>`).join('');
+  } catch (e) { toast(e.message); }
+}
+async function plApprove(id) {
+  // 需要先知道该版本属于哪个播放列表：从待审批行拿不到单号，这里用当前输入框单号
+  try {
+    await call('POST', '/playlists/'+val('plNo')+'/change-requests/'+id+'/approve', { comment: '同意' });
+    toast('改单已审批通过并锁版生效', true); plPending(); plLoad();
+  } catch (e) { toast(e.message); }
+}
+async function plReject(id) {
+  try {
+    await call('POST', '/playlists/'+val('plNo')+'/change-requests/'+id+'/reject', { comment: '不符合投放规范' });
+    toast('改单已驳回，原锁版继续生效', true); plPending();
+  } catch (e) { toast(e.message); }
+}
+async function plScanSwitch() {
+  try { const d = await call('POST', '/playlists/switch/scan'); toast('本轮到点切换上播 ' + d.switched + ' 块屏', true); plLoad(); plDetail(); }
+  catch (e) { toast(e.message); }
+}
+async function plScanLock() {
+  try { const d = await call('POST', '/playlists/locks/scan'); toast('本轮周五自动锁版新锁 ' + d.locked + ' 块屏', true); plLoad(); }
+  catch (e) { toast(e.message); }
+}
+async function plDetail() {
+  if (!val('plNo')) { return; }
+  try {
+    const d = await call('GET', '/playlists/'+val('plNo'));
+    const p = d.playlist;
+    const versions = (d.versions||[]).map(v =>
+      `<li>v${v.versionNo} · ${esc(v.weekStart)} 周 · <b>${esc(v.status)}</b> · ${esc(v.changeType)}
+       · ${v.slotCount}时段/${v.itemCount}条 · ${esc(v.operatorName)}${v.applicantName?(' · 申请:'+esc(v.applicantName)):''}${v.approverName?(' · 审批:'+esc(v.approverName)):''}</li>`).join('');
+    const events = (d.events||[]).map(e =>
+      `<li>v${e.versionNo} · <b>${esc(plEventLabel(e.eventType))}</b> · ${esc(e.operatorName)}
+       · ${esc(String(e.eventTime).replace('T',' '))}<br><span class="muted">${esc(e.detail)}</span></li>`).join('');
+    const alerts = (d.alerts||[]).map(a =>
+      `<li class="${a.status==='OPEN'?'':''}"><b>${esc(plAlertLabel(a.alertType))}</b> · ${a.status==='OPEN'?'<span class="tag failed">未处理</span>':'<span class="tag success">已解除</span>'}
+       · ${esc(a.switchDate||'')} ${esc(a.detail)}</li>`).join('');
+    document.getElementById('plDetail').innerHTML =
+      `<h3>全量档案 ${esc(p.playlistNo)}（屏 ${esc(p.siteNo)}）</h3>
+       <p><b>版本链（${(d.versions||[]).length}）</b></p><ul style="font-size:12px">${versions}</ul>
+       <p><b>告警（${(d.alerts||[]).length}）</b></p><ul style="font-size:12px">${alerts||'<li class="muted">无告警</li>'}</ul>
+       <p><b>事件留底（${(d.events||[]).length}）</b></p><ul style="font-size:12px">${events}</ul>`;
+  } catch (e) { toast(e.message); }
+}
+function plEventLabel(t){ return { CREATE:'建档', SAVE:'编排保存', COPY:'整段复制', SHIFT:'整段顺延',
+  LOCK:'人工锁版', AUTO_LOCK:'周五自动锁版', CHANGE_REQUEST:'锁后改单申请', APPROVE:'审批通过', REJECT:'审批驳回', SWITCH:'到点切换' }[t]||t; }
+function plAlertLabel(t){ return { SWITCH_FAILED:'切换失败', GAP:'播放空档', MISSING_ASSET:'素材缺失',
+  WEEK_EMPTY:'下周无排片', LOCK_FAILED:'自动锁版失败', PENDING_CHANGE:'改单待审批' }[t]||t; }
+
+// ---- ⑬ 安装派单与资质匹配 ----
+function inStatusTag(s){ return { PENDING:'<span class="tag offset">待匹配</span>',
+  ASSIGNED:'<span class="tag hung">已派单</span>', ARRIVED:'<span class="tag down">已到场</span>',
+  COMPLETED:'<span class="tag success">已完工</span>', CANCELLED:'<span class="tag failed">已取消</span>' }[s] || esc(s); }
+function inWorkLabel(s){ return s==='HIGH_ALTITUDE' ? '<span class="tag failed">高空</span>' : '普通'; }
+function inDt(s){ return s ? esc(s.replace('T',' ').slice(0,16)) : ''; }
+
+async function inCreateTeam(){
+  if(!val('inTeamName') || !val('inLeader')){ toast('队名、队长必填'); return; }
+  try{
+    const d = await call('POST','/install/teams',{ teamName:val('inTeamName'), leaderName:val('inLeader'),
+      contact:val('inContact') });
+    toast('安装队已建档：' + d.teamNo, true);
+    document.getElementById('inCertTeam').value = d.teamNo;
+    ['inTeamName','inLeader','inContact'].forEach(i=>document.getElementById(i).value='');
+    inLoadTeams();
+  }catch(e){ toast(e.message); }
+}
+async function inRegisterCert(){
+  if(!val('inCertTeam') || !val('inCertNo') || !val('inExpiryDate')){ toast('安装队、证书编号、到期日必填'); return; }
+  try{
+    const d = await call('POST','/install/certs',{ teamNo:val('inCertTeam'), certType:val('inCertType'),
+      certNo:val('inCertNo'), certName:val('inCertName'), issueDate:val('inIssueDate'), expiryDate:val('inExpiryDate') });
+    toast('资质已登记：' + d.certNo + '，到期 ' + d.expiryDate, true);
+    ['inCertNo','inCertName','inIssueDate','inExpiryDate'].forEach(i=>document.getElementById(i).value='');
+  }catch(e){ toast(e.message); }
+}
+async function inLoadTeams(){
+  try{
+    const list = await call('GET','/install/teams');
+    document.getElementById('inTeamTable').innerHTML =
+      '<tr><th>队编号</th><th>队名</th><th>队长</th><th>联系</th><th>状态</th><th>资质版本</th><th></th></tr>'
+      + list.map(t=>`<tr class="${t.status==='DISABLED'?'closed':''}">
+        <td>${esc(t.teamNo)}</td><td>${esc(t.teamName)}</td><td>${esc(t.leaderName)}</td><td>${esc(t.contact)||''}</td>
+        <td>${t.status==='ACTIVE'?'在册':'停用'}</td><td>v${t.currentVersionNo}</td>
+        <td><button class="sm gray" onclick="inCerts('${esc(t.teamNo)}')">资质</button>
+            <button class="sm gray" onclick="document.getElementById('inCertTeam').value='${esc(t.teamNo)}'">登记证</button></td></tr>`).join('')
+      || '<tr><td class="muted">还没有安装队</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+async function inCerts(teamNo){
+  try{
+    const certs = await call('GET','/install/teams/'+encodeURIComponent(teamNo)+'/certs');
+    const map = { WORK_AT_HEIGHT:'高空作业证', ELECTRICIAN:'电工作业证', SAFETY_OTHER:'其他安全证' };
+    toast(teamNo + ' 共 ' + certs.length + ' 张资质：' + certs.map(c=>map[c.certType]+'('+c.expiryDate+','
+      +({VALID:'有效',EXPIRED:'过期',REVOKED:'吊销'}[c.status]||c.status)+')').join('，'), certs.length>0);
+  }catch(e){ toast(e.message); }
+}
+async function inScan(){
+  try{ const d = await call('POST','/install/match/scan'); toast('补扫完成，本次新派成 ' + d.matched + ' 张', true); inLoad(); }
+  catch(e){ toast(e.message); }
+}
+async function inLoad(){
+  try{
+    const q='?status='+encodeURIComponent(val('inQStatus')||'')+'&teamNo='+encodeURIComponent(val('inQTeam')||'')
+      +'&siteNo='+encodeURIComponent(val('inQSite')||'')+'&keyword='+encodeURIComponent(val('inQKeyword')||'');
+    const list = await call('GET','/install/orders'+q);
+    document.getElementById('inTable').innerHTML =
+      '<tr><th>派单号</th><th>上刊单</th><th>点位</th><th>性质</th><th>状态</th><th>版本</th><th>安装队</th><th>计划档期</th><th>到场</th><th>完工</th><th>准时</th><th>改期</th><th></th></tr>'
+      + list.map(o=>`<tr class="${o.status==='CANCELLED'?'closed':''}">
+        <td>${esc(o.dispatchNo)}</td><td>${esc(o.orderNo)}</td><td>${esc(o.siteNo)}</td>
+        <td>${inWorkLabel(o.workType)}</td><td>${inStatusTag(o.status)}</td><td>v${o.versionNo}</td>
+        <td>${esc(o.teamNameSnapshot||'')}</td>
+        <td>${inDt(o.planStart)}<br>${inDt(o.planEnd)}</td><td>${inDt(o.arriveTime)}</td><td>${inDt(o.finishTime)}</td>
+        <td>${o.onTime==null?'':(o.onTime===1?'<span class="tag success">准时</span>':'<span class="tag failed">延误</span>')}</td>
+        <td>${o.rescheduleCount||0}</td>
+        <td><button class="sm gray" onclick="inPick('${esc(o.dispatchNo)}','${esc(o.teamNo||'')}')">选</button></td></tr>`).join('')
+      || '<tr><td class="muted">没有派单（上刊单确认后自动生成）</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+function inPick(no, teamNo){
+  document.getElementById('inNo').value = no;
+  if(teamNo) document.getElementById('inMatchTeam').value = teamNo;
+}
+async function inMatch(){
+  if(!val('inNo')){ toast('先填派单号'); return; }
+  const body = { teamNo:val('inMatchTeam') };
+  if(val('inMatchStart')) body.planStart = val('inMatchStart');
+  if(val('inMatchEnd')) body.planEnd = val('inMatchEnd');
+  try{
+    const d = await call('POST','/install/orders/'+encodeURIComponent(val('inNo'))+'/match', body);
+    toast('已派单给：' + d.teamNameSnapshot, true); inLoad();
+  }catch(e){ toast(e.message); }
+}
+async function inReschedule(){
+  if(!val('inNo') || !val('inNewStart') || !val('inNewEnd')){ toast('派单号、新档期起止必填'); return; }
+  try{
+    const d = await call('POST','/install/orders/'+encodeURIComponent(val('inNo'))+'/reschedule',
+      { newStart:val('inNewStart'), newEnd:val('inNewEnd'), reason:val('inReason') });
+    toast('已改期并通知安装队（第 ' + d.rescheduleCount + ' 次）', true); inLoad();
+  }catch(e){ toast(e.message); }
+}
+function inFill(fd, inputId){ const fs=document.getElementById(inputId).files; for(const f of fs) fd.append('photos', f); }
+async function inArrive(){
+  if(!val('inNo')){ toast('先填派单号'); return; }
+  if(document.getElementById('inArrivePhotos').files.length===0){ toast('到场打卡必须上传现场照片'); return; }
+  const fd = new FormData(); inFill(fd,'inArrivePhotos');
+  try{
+    const d = await callForm('/install/orders/'+encodeURIComponent(val('inNo'))+'/arrive', fd);
+    toast('已到场打卡：' + inDt(d.arriveTime), true); inLoad();
+  }catch(e){ toast(e.message); }
+}
+async function inComplete(){
+  if(!val('inNo') || !val('inFinishResult')){ toast('派单号、完工回执内容必填'); return; }
+  const fd = new FormData();
+  fd.append('finishResult', val('inFinishResult'));
+  inFill(fd,'inFinishPhotos');
+  try{
+    const d = await callForm('/install/orders/'+encodeURIComponent(val('inNo'))+'/complete', fd);
+    toast('完工回执已回传，' + (d.onTime===1?'准时':'延误') + '，上刊单随状态完工', true); inLoad();
+  }catch(e){ toast(e.message); }
+}
+async function inDetail(){
+  try{
+    const d = await call('GET','/install/orders/'+encodeURIComponent(val('inNo')));
+    const o = d.order;
+    const photos = (d.photos||[]).map(p=>`<li>${p.phase==='ARRIVAL'?'到场':'完工'}：<a href="${API}/install/photos/${p.id}/download" target="_blank">${esc(p.fileName)}</a>（${esc(p.uploaderName)} ${inDt(p.uploadTime)}）</li>`).join('');
+    const notices = (d.notices||[]).map(n=>`<li>第${n.se}次：${inDt(n.oldStart)} → ${inDt(n.newStart)}；${esc(n.reason||'')}</li>`).join('');
+    const events = (d.events||[]).map(e=>`<li>v${e.versionNo} ${inDt(e.eventTime)} ${esc(e.operatorName)} · ${esc(e.detail||'')}</li>`).join('');
+    document.getElementById('inDetail').innerHTML =
+      `<div class="event"><p><b>${esc(o.dispatchNo)}</b>（上刊单 ${esc(o.orderNo)}，点位 ${esc(o.siteNo)}，${inWorkLabel(o.workType)}）
+        状态 ${inStatusTag(o.status)}，安装队 ${esc(o.teamNameSnapshot||'待匹配')}，计划 ${inDt(o.planStart)}~${inDt(o.planEnd)}，改期 ${o.rescheduleCount||0} 次</p>
+        ${d.receipt?`<p><b>完工回执</b>：${inDt(d.receipt.finishTime)}，${d.receipt.onTime===1?'准时':'延误'}；${esc(d.receipt.receiptContent||'')}</p>`:''}
+       <p><b>改期通知（${(d.notices||[]).length}）</b></p><ul style="font-size:12px">${notices||'<li class="muted">无</li>'}</ul>
+       <p><b>照片（${(d.photos||[]).length}）</b></p><ul style="font-size:12px">${photos||'<li class="muted">无</li>'}</ul>
+       <p><b>事件留底（${(d.events||[]).length}）</b></p><ul style="font-size:12px">${events}</ul></div>`;
+  }catch(e){ toast(e.message); }
+}
+async function inReport(){
+  if(!val('inPeriod')){ toast('先选归属期间 yyyy-MM'); return; }
+  try{
+    const rows = await call('GET','/install/reports/team-month?period='+encodeURIComponent(val('inPeriod')));
+    document.getElementById('inReportTable').innerHTML =
+      '<tr><th>期间</th><th>队编号</th><th>队名</th><th>完工量</th><th>准时</th><th>延误</th><th>准时率</th><th>在途未完工</th></tr>'
+      + rows.map(r=>`<tr><td>${esc(r.period)}</td><td>${esc(r.teamNo)}</td><td>${esc(r.teamName)}</td>
+        <td>${r.completedCount}</td><td>${r.onTimeCount}</td><td>${r.lateCount}</td>
+        <td><b>${(r.onTimeRate*100).toFixed(2)}%</b></td><td>${r.assignedOpenCount}</td></tr>`).join('')
+      || '<tr><td class="muted">无数据</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+function inExport(){
+  if(!val('inPeriod')){ toast('先选归属期间'); return; }
+  window.open(API + '/install/reports/team-month/export?period=' + encodeURIComponent(val('inPeriod')), '_blank');
+}
+
+// ===== F9 代理协议与结算 =====
+function agCurPeriod() { return new Date().toISOString().slice(0, 7); }
+function agAgentTag(s) {
+  return { ACTIVE: '<span class="tag success">在册</span>', DISABLED: '<span class="tag pending">停用</span>' }[s] || esc(s);
+}
+function agAgrTag(s) {
+  return { ACTIVE: '<span class="tag success">生效中</span>', TERMINATED: '<span class="tag failed">已终止</span>' }[s] || esc(s);
+}
+function agVerTag(s) {
+  return { PENDING: '<span class="tag pending">待生效</span>', EFFECTIVE: '<span class="tag success">生效中</span>',
+    SUPERSEDED: '<span class="tag down">已被新版取代</span>' }[s] || esc(s);
+}
+
+async function agCreate() {
+  if (!val('agName') || !val('agLogin')) { toast('代理名称与绑定登录账号必填'); return; }
+  try {
+    await call('POST', '/agents', { agentName: val('agName'), loginUsername: val('agLogin'),
+      contactName: val('agContact'), contactPhone: val('agPhone') });
+    toast('代理建档成功', true); ['agName','agLogin','agContact','agPhone'].forEach(i => document.getElementById(i).value = '');
+    agLoadAgents();
+  } catch (e) { toast(e.message); }
+}
+
+async function agLoadAgents() {
+  try {
+    const rows = await call('GET', '/agents');
+    document.getElementById('agentTable').innerHTML =
+      '<tr><th>代理编号</th><th>代理名称</th><th>绑定登录账号</th><th>联系人</th><th>电话</th><th>状态</th></tr>'
+      + rows.map(a => `<tr><td>${esc(a.agentNo)}</td><td>${esc(a.agentName)}</td><td>${esc(a.loginUsername)}</td>
+        <td>${esc(a.contactName)}</td><td>${esc(a.contactPhone)}</td><td>${agAgentTag(a.status)}</td></tr>`).join('')
+      || '<tr><td class="muted">无数据（代理账号只能看到自己）</td></tr>';
+  } catch (e) { toast(e.message); }
+}
+
+async function agCreateAgreement() {
+  if (!val('agAgtNo') || !val('agSiteNo') || !val('agRate')) { toast('代理编号、点位编号、比例必填'); return; }
+  try {
+    await call('POST', '/agents/agreements', { agentNo: val('agAgtNo'), siteNo: val('agSiteNo'),
+      commissionRate: val('agRate'), effectiveFromPeriod: val('agFrom') });
+    toast('挂协议成功', true); ['agAgtNo','agSiteNo','agRate','agFrom'].forEach(i => document.getElementById(i).value = '');
+    agLoadAgreements();
+  } catch (e) { toast(e.message); }
+}
+
+async function agLoadAgreements() {
+  let q = [];
+  if (val('agQAgtNo')) q.push('agentNo=' + encodeURIComponent(val('agQAgtNo')));
+  if (val('agQSite')) q.push('siteNo=' + encodeURIComponent(val('agQSite')));
+  if (val('agQStatus')) q.push('status=' + encodeURIComponent(val('agQStatus')));
+  try {
+    const rows = await call('GET', '/agents/agreements' + (q.length ? '?' + q.join('&') : ''));
+    document.getElementById('agreementTable').innerHTML =
+      '<tr><th>协议号</th><th>代理编号</th><th>代理名</th><th>点位</th><th>状态</th><th>当前版本</th><th>起始期</th><th>终止期</th></tr>'
+      + rows.map(a => `<tr><td>${esc(a.agreementNo)}</td><td>${esc(a.agentNo)}</td><td>${esc(a.agentNameSnapshot)}</td>
+        <td>${esc(a.siteNo)}</td><td>${agAgrTag(a.status)}</td><td>v${a.currentVersionNo || '-'}</td>
+        <td>${esc(a.effectiveFromPeriod || '')}</td><td>${esc(a.terminateFromPeriod || '')}</td></tr>`).join('')
+      || '<tr><td class="muted">无数据</td></tr>';
+  } catch (e) { toast(e.message); }
+}
+
+async function agAdjust() {
+  if (!val('agAgNo') || !val('agNewRate')) { toast('协议号与调整后比例必填'); return; }
+  try {
+    await call('POST', '/agents/agreements/' + encodeURIComponent(val('agAgNo')) + '/adjust',
+      { commissionRate: val('agNewRate'), effectiveFromPeriod: val('agNewFrom'), reason: val('agReason') });
+    toast('调整已提交，从下一结算期生效（历史期不重算）', true);
+    agLoadVersions(); agLoadAgreements();
+  } catch (e) { toast(e.message); }
+}
+
+async function agTerminate() {
+  if (!val('agAgNo')) { toast('先填协议号'); return; }
+  try {
+    await call('POST', '/agents/agreements/' + encodeURIComponent(val('agAgNo')) + '/terminate',
+      { effectiveFromPeriod: val('agNewFrom'), reason: val('agReason') });
+    toast('终止已提交，从下一结算期起不再分账', true);
+    agLoadVersions(); agLoadAgreements();
+  } catch (e) { toast(e.message); }
+}
+
+async function agLoadVersions() {
+  if (!val('agAgNo')) { toast('先填协议号'); return; }
+  try {
+    const rows = await call('GET', '/agents/agreements/' + encodeURIComponent(val('agAgNo')) + '/versions');
+    document.getElementById('agreementVersionTable').innerHTML =
+      '<tr><th>版本</th><th>类型</th><th>分账比例</th><th>起始生效期</th><th>状态</th><th>原因</th><th>经手人</th></tr>'
+      + rows.map(v => `<tr><td>v${v.versionNo}</td><td>${esc(v.changeType)}</td><td>${v.commissionRate}</td>
+        <td>${esc(v.effectiveFromPeriod)}</td><td>${agVerTag(v.status)}</td>
+        <td>${esc(v.reason || '')}</td><td>${esc(v.operatorName)}</td></tr>`).join('')
+      || '<tr><td class="muted">无版本</td></tr>';
+  } catch (e) { toast(e.message); }
+}
+
+async function agSettle() {
+  const box = document.getElementById('agSettleResult');
+  try {
+    const run = await call('POST', '/agent-settlements',
+      { period: val('agSettlePeriod'), agentNo: val('agSettleAgt') });
+    const created = run.created.map(s => `${s.settlementNo}  ${s.agentNameSnapshot}  ${s.bizPeriod}  `
+      + `流水 ${s.totalRevenue}  代理 ${s.totalCommission}  平台 ${s.totalPlatform}  尾差 ${s.roundingDiff}  `
+      + (s.balanced === 1 ? '对平' : '未对平')).join('\n');
+    const skipped = run.skipped.map(x => `跳过 ${x.agentName}：${x.reason}`).join('\n');
+    box.style.display = 'block';
+    box.textContent = `结算期 ${run.period}\n新建 ${run.created.length} 张：\n${created || '（无）'}\n跳过 ${run.skipped.length} 个：\n${skipped || '（无）'}`;
+    agLoadSettlements();
+  } catch (e) { box.style.display = 'none'; toast(e.message); }
+}
+
+async function agLoadSettlements() {
+  const period = val('agQPeriod') || agCurPeriod();
+  document.getElementById('agQPeriod').value = period;
+  let url = '/agent-settlements?period=' + encodeURIComponent(period);
+  if (val('agQAgt2')) url += '&agentNo=' + encodeURIComponent(val('agQAgt2'));
+  try {
+    const rows = await call('GET', url);
+    document.getElementById('settlementTable').innerHTML =
+      '<tr><th>结算单号</th><th>代理编号</th><th>代理名</th><th>期间</th><th>笔数</th><th>流水总额</th><th>代理分账</th><th>平台(原始)</th><th>尾差</th><th>平台(兜底)</th><th>对平</th></tr>'
+      + rows.map(s => `<tr${s.balanced === 1 ? '' : ' class="closed"'}><td>${esc(s.settlementNo)}</td><td>${esc(s.agentNo)}</td>
+        <td>${esc(s.agentNameSnapshot)}</td><td>${esc(s.bizPeriod)}</td><td>${s.orderCount}</td>
+        <td>${s.totalRevenue}</td><td><b>${s.totalCommission}</b></td><td>${s.totalPlatformRaw}</td>
+        <td>${s.roundingDiff === 0 ? '0.00' : '<span style=\"color:#c0392b\">' + s.roundingDiff + '</span>'}</td>
+        <td>${s.totalPlatform}</td><td>${s.balanced === 1 ? '<span class=\"tag success\">对平</span>' : '<span class=\"tag failed\">未对平</span>'}</td></tr>`).join('')
+      || '<tr><td class="muted">该期无结算单（代理账号只见自己）</td></tr>';
+  } catch (e) { toast(e.message); }
+}
+
+async function agDetail() {
+  if (!val('agStNo')) { toast('先填结算单号'); return; }
+  try {
+    const v = await call('GET', '/agent-settlements/' + encodeURIComponent(val('agStNo')));
+    const s = v.settlement;
+    document.getElementById('agDetail').innerHTML =
+      `<h3 style="margin-top:10px">结算单 ${esc(s.settlementNo)}（${esc(s.agentNameSnapshot)} · ${esc(s.bizPeriod)}）`
+      + `流水 ${s.totalRevenue} ｜ 代理 ${s.totalCommission} ｜ 平台原始 ${s.totalPlatformRaw} ｜ 尾差 ${s.roundingDiff} ｜ 平台兜底 ${s.totalPlatform} ｜ ${s.balanced === 1 ? '对平' : '未对平'}</h3>`
+      + '<table><tr><th>上刊单号</th><th>点位</th><th>画面</th><th>协议版本</th><th>比例</th><th>流水</th><th>代理分账</th><th>平台(原始)</th><th>行尾差</th><th>平台(兜底)</th></tr>'
+      + v.lines.map(l => `<tr><td>${esc(l.orderNo)}</td><td>${esc(l.siteNo)}</td><td>${esc(l.creativeNameSnapshot)}</td>
+        <td>v${l.agreementVersionNo}</td><td>${l.commissionRate}</td><td>${l.revenueAmount}</td>
+        <td><b>${l.commissionAmount}</b></td><td>${l.platformAmountRaw}</td>
+        <td>${l.lineRoundingDiff === 0 ? '0.00' : '<span style=\"color:#c0392b\">' + l.lineRoundingDiff + '</span>'}</td>
+        <td>${l.platformAmount}</td></tr>`).join('') + '</table>';
+  } catch (e) { toast(e.message); }
+}
+
+function agExportSummary() {
+  const period = val('agQPeriod') || agCurPeriod();
+  window.open(API + '/agent-settlements/export?period=' + encodeURIComponent(period), '_blank');
+}
+function agExportLines() {
+  if (!val('agStNo')) { toast('先填结算单号'); return; }
+  window.open(API + '/agent-settlements/' + encodeURIComponent(val('agStNo')) + '/export', '_blank');
+}
+
+init();
+</script>
+</body>
+</html>

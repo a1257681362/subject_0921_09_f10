@@ -1,0 +1,104 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: evops-base
+  aop:
+    proxy-target-class: true
+  profiles:
+    active: dev
+  jackson:
+    time-zone: Asia/Shanghai
+    serialization:
+      write-dates-as-timestamps: false
+  datasource:
+    url: jdbc:h2:file:./data/evops;AUTO_SERVER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+# 素材多规格转档
+asset:
+  # 原图与各规格产物的本地落盘根目录
+  storage-root: ./data/assets
+  # 常规规格：投放信息流的横版 / 竖版两版（宽:高，居中裁切），长边压进限定像素
+  specs:
+    - name: feed_landscape
+      usage: 信息流横版
+      ratio: "16:9"
+      long-edge: 1280
+    - name: feed_portrait
+      usage: 信息流竖版
+      ratio: "9:16"
+      long-edge: 1280
+  # 产物体积上限（字节），超标就再压一轮质量
+  max-file-size: 300KB
+  quality:
+    # 首轮质量；每超一轮上限降到下一档，直至下限
+    initial: 0.85
+    floor: 0.5
+    decrement: 0.15
+
+# 年度刊例
+rate-card:
+  # 默认税率：建刊例版本时未单独指定税率用它（0.06 = 6%）；挂牌单价为未税价
+  default-tax-rate: 0.06
+
+# F6 异常上报整改
+rectify:
+  # 留证照片落盘根目录（单子关闭前不许删）
+  storage-root: ./data/rectify-photos
+  # 整改期限（小时）：派单时刻 + 它 = 期限；复勘驳回返工重新计时
+  deadline-hours: 48
+  # 超期抄送扫描间隔（毫秒，默认 10 分钟；启动 30 秒后先扫一轮）
+  escalation-scan-delay-ms: 600000
+  # 逐级抄送阶梯：after-hours = 超过整改期限后的小时数（0 = 期限一过即抄送本级）
+  escalation:
+    - after-hours: 0
+      target: 维护主管
+    - after-hours: 48
+      target: 运营经理
+    - after-hours: 120
+      target: 分管总监
+
+# F7 屏体播放列表排片
+playlist:
+  # 到点切换扫描间隔（毫秒，默认 30 秒；启动 20 秒后先扫一轮），到点自动切到应播时段
+  switch-scan-delay-ms: 30000
+  # 周锁版扫描间隔（毫秒，默认 10 分钟）；周五下班时刻（默认 18:00）一过，把下周还没锁版的排片全部锁版
+  lock-scan-delay-ms: 600000
+  # 周五下班时刻（HH:mm，24 小时制）：下周排片应在此刻前全部锁版
+  friday-deadline: "18:00"
+
+# F8 安装派单与资质匹配
+install:
+  # 到场/完工照片落盘根目录
+  storage-root: ./data/install-photos
+  # 待匹配派单补扫间隔（毫秒，默认 10 分钟；启动 40 秒后先扫一轮）
+  pending-scan-delay-ms: 600000
+  # 自动派单默认作业时段：上刊档期周一 default-start-hour 起、时长 default-job-hours 小时
+  default-job-hours: 4
+  default-start-hour: 9
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.evops
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com.evops: INFO
