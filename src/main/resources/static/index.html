@@ -84,6 +84,7 @@
     <div class="tab" data-tab="playlist">⑫ 屏体播放排片</div>
     <div class="tab" data-tab="install">⑬ 安装派单资质</div>
     <div class="tab" data-tab="agent">⑭ 代理协议结算</div>
+    <div class="tab" data-tab="compliance">⑮ 受限行业名单</div>
   </div>
 
   <!-- 点位挂牌 -->
@@ -118,12 +119,13 @@
     <div class="grid">
       <div><label>点位编号 *</label><input id="postSiteNo" placeholder="已挂牌的点位编号"></div>
       <div><label>画面名称 *</label><input id="postCreative" placeholder="如 中秋档主视觉"></div>
-      <div><label>引用报价单号（授信上刊填 QT…，留空为普通单）</label><input id="postQuoteNo" placeholder="QT…"></div>
+      <div><label>引用报价单号（授信上刊填 QT…，留空为普通单）</label><input id="postQuoteNo" placeholder="QT…" onblur="postCheckQuote()"></div>
       <div><label>上刊发生日（决定档期周/归属月）</label><input id="postDate" type="date"></div>
       <div><label>经手人（留空取登录人）</label><input id="postOperator"></div>
       <div class="span2"><label>备注</label><input id="postRemark"></div>
     </div>
-    <div class="actions"><button onclick="createOrder()">开单上刊</button></div>
+    <div class="failbox" id="postQuoteWarn" style="display:none;margin-top:8px"></div>
+    <div class="actions"><button id="postSubmitBtn" onclick="createOrder()">开单上刊</button></div>
     <p class="muted" style="margin-top:10px">单号由系统唯一生成（PO+序列）；同一点位同一周只能挂一张画面；归属月按发生日落死。</p>
   </div>
 
@@ -369,12 +371,14 @@
     <h3>客户建档授信（建档即 v1 生效；客户名须与报价单客户名一致）</h3>
     <div class="grid">
       <div><label>客户名称 *</label><input id="crName"></div>
+      <div><label>行业类目 *（命中受限当场拒收）</label><select id="crIndustry" onchange="crOnIndustryChange()"></select></div>
       <div><label>归属销售（财务可指定，销售默认自己）</label><input id="crOwner" placeholder="sales1"></div>
       <div><label>信用额度（含税）*</label><input id="crLimit" placeholder="50000.00"></div>
       <div><label>联系人</label><input id="crContact"></div>
       <div class="span2"><label>备注</label><input id="crRemark"></div>
-      <div style="align-self:end"><button onclick="createCustomer()">建档授信</button></div>
+      <div style="align-self:end"><button id="crSubmitBtn" onclick="createCustomer()">建档授信</button></div>
     </div>
+    <div class="failbox" id="crIndustryWarn" style="display:none;margin-top:8px"></div>
 
     <h3>客户翻查（销售只见名下）</h3>
     <div class="grid">
@@ -719,11 +723,70 @@
     </div>
     <div id="agDetail"></div>
   </div>
+
+  <!-- F10 受限行业类目名单 -->
+  <div class="panel" id="panel-compliance">
+    <p class="muted">受限行业名单由<b>合规岗</b>维护（compliance1 / demo）：即改即生效，每次调整留版本快照与操作记录；
+      命中受限的行业，客户建档与授信上刊提交两个口当场拦截，提示带法规依据。销售/财务仅可翻查。</p>
+
+    <div id="cpMaintainArea">
+      <h3>名单维护</h3>
+      <div class="grid">
+        <div><label>新类目编码 *（大写字母/数字/下划线，如 FINANCE）</label><input id="cpCode"></div>
+        <div><label>新类目名称 *</label><input id="cpName"></div>
+        <div style="align-self:end;display:flex;gap:8px">
+          <button onclick="cpAdd()">新增类目</button>
+          <button class="gray" onclick="cpLoadCats(true)">刷新（含停用）</button>
+        </div>
+      </div>
+      <table id="cpCategoryTable"></table>
+      <div class="grid" style="margin-top:8px">
+        <div><label>选中类目编码（点列表「选」）</label><input id="cpSelCode"></div>
+        <div><label>类目新名称（改名用，必填）</label><input id="cpNewName"></div>
+        <div class="span2"><label>法规依据（设受限必填；改名时可同步修改）</label><input id="cpBasis"></div>
+        <div class="span2"><label>备注</label><input id="cpRemark"></div>
+        <div style="align-self:end;display:flex;gap:8px;grid-column:span 2">
+          <button class="danger" onclick="cpRestrict()">设为受限</button>
+          <button onclick="cpRelease()">解除受限</button>
+          <button onclick="cpModify()">保存改名/依据</button>
+          <button class="gray" onclick="cpDisable()">停用类目</button>
+        </div>
+      </div>
+
+      <h3>在途单冻结工作台（圈定该类目客户挂起中的授信上刊单，先预览后执行）</h3>
+      <div class="grid">
+        <div><label>受限类目</label><select id="cpFreezeCode"></select></div>
+        <div class="span2"><label>冻结/解冻备注（落逐单事件留底）</label><input id="cpFreezeRemark"></div>
+        <div style="align-self:end;display:flex;gap:8px;grid-column:span 2">
+          <button class="gray" onclick="cpFreezePreview()">预览待冻结</button>
+          <button class="danger" onclick="cpFreezeExecute()">一键冻结</button>
+          <button class="gray" onclick="cpUnfreezePreview()">预览已冻结</button>
+          <button onclick="cpUnfreezeExecute()">一键解冻</button>
+        </div>
+      </div>
+      <pre class="event" id="cpFreezeBox" style="display:none"></pre>
+      <table id="cpFreezeTable"></table>
+    </div>
+
+    <h3>名单版本链（每次调整自动落版，全量快照可翻）</h3>
+    <div class="actions"><button class="gray" onclick="cpLoadVersions()">刷新版本</button></div>
+    <table id="cpVersionTable"></table>
+    <pre class="event" id="cpVersionSnapshot" style="display:none"></pre>
+
+    <h3>操作记录（谁、什么时候、把哪个条目从什么改成什么）</h3>
+    <div class="grid">
+      <div><label>只看类目编码（留空看全部）</label><input id="cpOpCode"></div>
+      <div style="align-self:end"><button class="gray" onclick="cpLoadOps()">翻查操作记录</button></div>
+    </div>
+    <table id="cpOpTable"></table>
+  </div>
 </div>
 
 <script>
 const API = '/api';
 let currentUser = null;
+let isCompliance = false;
+let industryCats = [];
 
 function toast(msg, ok) {
   const box = document.getElementById('toast');
@@ -756,32 +819,44 @@ function showLogin() { document.getElementById('login').style.display = 'block';
 function showApp(u) { currentUser = u; document.getElementById('login').style.display = 'none'; document.getElementById('app').style.display = 'block';
   document.querySelector('header .who') && (document.querySelector('header .who').textContent = '经手人：' + u); }
 
+/** 按 /me 的角色显隐合规维护区（真正鉴权在服务端，这里只做界面） */
+function applyRoles(me) {
+  isCompliance = !!me.complianceMaintainer;
+  const area = document.getElementById('cpMaintainArea');
+  if (area) area.style.display = isCompliance ? 'block' : 'none';
+}
+
 async function doLogin() {
   try {
     const d = await call('POST', '/login', { username: val('loginUser'), password: val('loginPass') });
-    showApp(d.username); toast('登录成功，欢迎 ' + d.username, true);
-    loadSites(); loadSpecs();
+    const me = await call('GET', '/me');
+    showApp(d.username); applyRoles(me);
+    toast('登录成功，欢迎 ' + d.username, true);
+    loadSites(); loadSpecs(); loadIndustryCats();
   } catch (e) { toast(e.message); }
 }
 
 async function init() {
   // header 占位（登录后填充）
   document.body.insertAdjacentHTML('afterbegin',
-    '<header><h1>户外广告点位与上刊底账 <span class="muted" style="color:#c8d4e6">EVOPS f1·f2·f3·f4·f5·f6·f7·f8·f9</span></h1><span class="who"></span></header>');
+    '<header><h1>户外广告点位与上刊底账 <span class="muted" style="color:#c8d4e6">EVOPS f1·f2·f3·f4·f5·f6·f7·f8·f9·f10</span></h1><span class="who"></span></header>');
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
     document.getElementById('panel-' + t.dataset.tab).classList.add('active');
     if (t.dataset.tab === 'rate') { loadRateCards(); }
-    if (t.dataset.tab === 'credit') { loadCustomers(); loadPending(); }
+    if (t.dataset.tab === 'credit') { loadCustomers(); loadPending(); loadIndustryCats(); }
     if (t.dataset.tab === 'rectify') { rfLoadTypes(); rfLoad(); }
     if (t.dataset.tab === 'playlist') { plLoad(); }
     if (t.dataset.tab === 'install') { inLoadTeams(); inLoad(); document.getElementById('inPeriod').value = new Date().toISOString().slice(0,7); }
     if (t.dataset.tab === 'agent') { agLoadAgents(); agLoadAgreements(); agLoadSettlements(); }
+    if (t.dataset.tab === 'compliance') { cpBoot(); }
   });
   document.getElementById('calPeriod').value = new Date().toISOString().slice(0, 7);
-  try { const me = await call('GET', '/me'); showApp(me.username); loadSites(); loadSpecs(); } catch (e) { showLogin(); }
+  try { const me = await call('GET', '/me'); showApp(me.username); applyRoles(me);
+    loadSites(); loadSpecs(); loadIndustryCats();
+  } catch (e) { showLogin(); }
 }
 
 async function registerSite() {
@@ -808,6 +883,28 @@ async function loadSites() {
   } catch (e) { toast(e.message); }
 }
 
+/** 报价单失焦预检：客户行业命中受限即亮依据、暂禁开单（提交时后端还会再硬拦一次） */
+async function postCheckQuote(){
+  const qno = (val('postQuoteNo')||'').trim();
+  const warn = document.getElementById('postQuoteWarn');
+  const btn = document.getElementById('postSubmitBtn');
+  if(!qno){ warn.style.display='none'; btn.disabled=false; btn.style.opacity=1; return; }
+  try{
+    const r = await call('POST','/compliance/check/order',{ quoteNo:qno });
+    if(r.blocked){
+      warn.style.display='block';
+      warn.textContent = '⛔ ' + r.message;
+      btn.disabled = true; btn.style.opacity = .5;
+    }else{
+      warn.style.display='none';
+      btn.disabled = false; btn.style.opacity = 1;
+    }
+  }catch(e){
+    // 报价单不存在等：放行到提交口，由后端按原口径报错
+    warn.style.display='none'; btn.disabled=false; btn.style.opacity=1;
+  }
+}
+
 async function createOrder() {
   try {
     const d = await call('POST', '/orders', { siteNo: val('postSiteNo'), creativeName: val('postCreative'),
@@ -816,6 +913,7 @@ async function createOrder() {
     toast('上刊成功，单号 ' + d.orderNo + '，档期 ' + d.weekStart + ' 至 ' + d.weekEnd + '，归属月 ' + d.bizPeriod
       + (d.creditUsed === 1 ? '，已占授信（报价 ' + d.quoteNo + '）' : ''), true);
     document.getElementById('actOrderNo').value = d.orderNo;
+    document.getElementById('postQuoteWarn').style.display='none';
   } catch (e) { toast(e.message); }
 }
 
@@ -831,7 +929,7 @@ async function loadOrders() {
         <td>${o.orderKind==='OFFSET'?'<span class="tag kind">对冲单</span>':'上刊单'}</td>
         <td>${esc(o.siteId)}</td><td>${esc(o.creativeName)}</td>
         <td>${esc(o.weekStart)} ~ ${esc(o.weekEnd)}</td><td>${esc(o.occurDate)}</td><td>${esc(o.bizPeriod)}</td>
-        <td>${statusTag(o.status)}</td><td>v${o.versionNo}</td><td>${esc(o.operatorName)}</td></tr>`).join('');
+        <td>${statusTag(o.status)}${o.complianceFrozen===1?' <span class="tag failed" title="'+esc(o.freezeReason||'')+'">合规冻结</span>':''}</td><td>v${o.versionNo}</td><td>${esc(o.operatorName)}</td></tr>`).join('');
   } catch (e) { toast(e.message); }
 }
 function pickOrder(no) { document.getElementById('actOrderNo').value = no; toast('已填入选中单号 ' + no, true); }
@@ -1403,24 +1501,66 @@ function settleTag(s){ return {UNSETTLED:'未核销',PARTIAL:'<span class="tag p
 function pickCust(no){ document.getElementById('chgCustNo').value=no; document.getElementById('payCustNo').value=no; toast('已填客户编号 '+no,true); }
 
 async function createCustomer(){
+  const sel = document.getElementById('crIndustry');
+  const code = sel.value;
+  if(!code){ toast('请选择行业类目'); return; }
+  const hit = industryCats.find(c=>c.categoryCode===code && c.restricted===1);
+  if(hit){ toast('该行业命中受限名单，页面已拦截：'+hit.legalBasis); return; }
   try{
-    await call('POST','/credit/customers',{ customerName:val('crName'), ownerSales:val('crOwner'),
+    await call('POST','/credit/customers',{ customerName:val('crName'),
+      industryCategoryCode:code,
+      ownerSales:val('crOwner'),
       creditLimit:val('crLimit'), contactName:val('crContact'), remark:val('crRemark') });
     toast('客户建档授信成功',true); loadCustomers();
     ['crName','crOwner','crLimit','crContact','crRemark'].forEach(i=>document.getElementById(i).value='');
   }catch(e){ toast(e.message); }
 }
+
+/** 拉在档行业类目，灌建档下拉与合规冻结下拉 */
+async function loadIndustryCats(){
+  try{
+    industryCats = await call('GET','/compliance/categories');
+    const sel = document.getElementById('crIndustry');
+    sel.innerHTML = '<option value="">请选择行业类目…</option>'
+      + industryCats.map(c=>`<option value="${esc(c.categoryCode)}">${esc(c.categoryName)}（${esc(c.categoryCode)}）${c.restricted===1?'⛔受限':''}</option>`).join('');
+    crOnIndustryChange();
+    const fs = document.getElementById('cpFreezeCode');
+    if(fs) fs.innerHTML = '<option value="">请选择类目…</option>'
+      + industryCats.map(c=>`<option value="${esc(c.categoryCode)}">${esc(c.categoryName)}（${esc(c.categoryCode)}）${c.restricted===1?'⛔受限':'·已解除'}</option>`).join('');
+  }catch(e){ /* 未登录或无权限时忽略，切到对应 tab 再拉 */ }
+}
+
+/** 建档选到受限类目：当场亮依据、禁用提交（后端仍硬拦，页面只是第一道） */
+function crOnIndustryChange(){
+  const sel = document.getElementById('crIndustry');
+  const warn = document.getElementById('crIndustryWarn');
+  const btn = document.getElementById('crSubmitBtn');
+  const hit = industryCats.find(c=>c.categoryCode===sel.value && c.restricted===1);
+  if(hit){
+    warn.style.display='block';
+    warn.textContent = '⛔ 命中受限行业名单，禁止客户建档。依据：' + hit.legalBasis;
+    btn.disabled = true; btn.style.opacity = .5;
+  }else{
+    warn.style.display='none';
+    btn.disabled = false; btn.style.opacity = 1;
+  }
+}
+
 async function loadCustomers(){
   try{
     const list=await call('GET','/credit/customers?keyword='+encodeURIComponent(val('qCrName')||'')
       +'&status='+encodeURIComponent(val('qCrStatus')||''));
     document.getElementById('customerTable').innerHTML=
-      '<tr><th>客户编号</th><th>客户名称</th><th>归属销售</th><th>额度</th><th>已占用</th><th>可用</th><th>状态</th><th>当前版本</th></tr>'
-      + list.map(c=>`<tr><td><a href="javascript:void(0)" onclick="pickCust('${esc(c.customerNo)}')">${esc(c.customerNo)}</a></td>
-        <td>${esc(c.customerName)}</td><td>${esc(c.ownerSales)}</td>
+      '<tr><th>客户编号</th><th>客户名称</th><th>行业类目</th><th>归属销售</th><th>额度</th><th>已占用</th><th>可用</th><th>状态</th><th>当前版本</th></tr>'
+      + list.map(c=>{
+        const catHit = industryCats.find(x=>x.categoryCode===c.industryCategoryCode && x.restricted===1);
+        return `<tr><td><a href="javascript:void(0)" onclick="pickCust('${esc(c.customerNo)}')">${esc(c.customerNo)}</a></td>
+        <td>${esc(c.customerName)}</td>
+        <td>${esc(c.industryCategoryName)||'-'}<br><span class="muted">${esc(c.industryCategoryCode)||''}</span>${catHit?' <span class="tag failed">受限</span>':''}</td>
+        <td>${esc(c.ownerSales)}</td>
         <td>${money(c.creditLimit)}</td><td>${money(c.occupiedAmount)}</td>
         <td><b>${money((c.creditLimit-c.occupiedAmount).toFixed(2))}</b></td>
-        <td>${crStatusTag(c.creditStatus)}</td><td>v${c.currentVersionNo}</td></tr>`).join('')
+        <td>${crStatusTag(c.creditStatus)}</td><td>v${c.currentVersionNo}</td></tr>`;}).join('')
       || '<tr><td class="muted">没有客户</td></tr>';
   }catch(e){ toast(e.message); }
 }
@@ -2099,6 +2239,172 @@ function agExportSummary() {
 function agExportLines() {
   if (!val('agStNo')) { toast('先填结算单号'); return; }
   window.open(API + '/agent-settlements/' + encodeURIComponent(val('agStNo')) + '/export', '_blank');
+}
+
+// ===== F10 受限行业类目名单（合规） =====
+
+function cpBoot(){ loadIndustryCats(); cpLoadCats(true); cpLoadVersions(); cpLoadOps(); }
+
+function cpStatusTag(c){
+  if(c.status==='DISABLED') return '<span class="tag pending">停用</span>';
+  return c.restricted===1 ? '<span class="tag failed">⛔受限</span>' : '<span class="tag success">普通</span>';
+}
+
+async function cpLoadCats(all){
+  try{
+    const list = await call('GET','/compliance/categories?includeDisabled='+(all?'true':'false'));
+    document.getElementById('cpCategoryTable').innerHTML =
+      '<tr><th>编码</th><th>名称</th><th>状态</th><th>法规依据</th><th>受限时间</th><th>当前版本</th><th>经手人</th><th></th></tr>'
+      + list.map(c=>`<tr>
+        <td>${esc(c.categoryCode)}</td><td>${esc(c.categoryName)}</td><td>${cpStatusTag(c)}</td>
+        <td style="max-width:360px">${esc(c.legalBasis)||''}</td>
+        <td>${esc(c.restrictedTime)||''}</td><td>v${c.currentVersionNo||0}</td>
+        <td>${esc(c.operatorName)}</td>
+        <td><button class="sm gray" onclick="cpPick('${esc(c.categoryCode)}','${esc(c.categoryName).replace(/'/g,'')}')">选</button></td></tr>`).join('')
+      || '<tr><td class="muted">没有类目</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+
+function cpPick(code, name){
+  document.getElementById('cpSelCode').value = code;
+  document.getElementById('cpNewName').value = name;
+  const cur = industryCats.find(c=>c.categoryCode===code);
+  document.getElementById('cpBasis').value = cur && cur.legalBasis ? cur.legalBasis : '';
+}
+
+function cpSelectedCode(){
+  const code = (val('cpSelCode')||'').trim();
+  if(!code){ toast('请先在列表点「选」或手填类目编码'); return null; }
+  return code;
+}
+
+async function cpAdd(){
+  if(!val('cpCode')||!val('cpName')){ toast('编码与名称必填'); return; }
+  try{
+    await call('POST','/compliance/categories',{ categoryCode:val('cpCode'), categoryName:val('cpName'), remark:val('cpRemark') });
+    toast('类目已新增并即时生效，版本已记录',true);
+    ['cpCode','cpName'].forEach(i=>document.getElementById(i).value='');
+    cpBoot();
+  }catch(e){ toast(e.message); }
+}
+
+async function cpRestrict(){
+  const code = cpSelectedCode(); if(!code) return;
+  if(!val('cpBasis')){ toast('设为受限必须填写法规依据（拦截提示要带依据）'); return; }
+  try{
+    await call('POST','/compliance/categories/'+encodeURIComponent(code)+'/restrict',
+      { legalBasis:val('cpBasis'), remark:val('cpRemark') });
+    toast('已设为受限并即时生效：建档/授信上刊提交口即刻拦截',true); cpBoot();
+  }catch(e){ toast(e.message); }
+}
+
+async function cpRelease(){
+  const code = cpSelectedCode(); if(!code) return;
+  try{
+    await call('POST','/compliance/categories/'+encodeURIComponent(code)+'/release',{ remark:val('cpRemark') });
+    toast('已解除受限；此前冻结的在途单请到冻结工作台一键解冻',true); cpBoot();
+  }catch(e){ toast(e.message); }
+}
+
+async function cpModify(){
+  const code = cpSelectedCode(); if(!code) return;
+  if(!val('cpNewName')){ toast('类目新名称必填'); return; }
+  try{
+    await call('POST','/compliance/categories/'+encodeURIComponent(code)+'/modify',
+      { categoryName:val('cpNewName'), legalBasis:val('cpBasis'), remark:val('cpRemark') });
+    toast('类目信息已更新并即时生效',true); cpBoot();
+  }catch(e){ toast(e.message); }
+}
+
+async function cpDisable(){
+  const code = cpSelectedCode(); if(!code) return;
+  try{
+    await call('POST','/compliance/categories/'+encodeURIComponent(code)+'/disable',{ remark:val('cpRemark') });
+    toast('类目已停用，建档不可再选（历史客户留名）',true); cpBoot();
+  }catch(e){ toast(e.message); }
+}
+
+async function cpLoadVersions(){
+  try{
+    const vs = await call('GET','/compliance/versions');
+    document.getElementById('cpVersionTable').innerHTML =
+      '<tr><th>版本</th><th>动作</th><th>对象</th><th>条目数</th><th>受限数</th><th>状态</th><th>操作人</th><th>生效时间</th><th>说明</th><th></th></tr>'
+      + vs.map(v=>`<tr>
+        <td>v${v.versionNo}</td><td>${esc(v.changeType)}</td><td>${esc(v.targetCode)||'-'}</td>
+        <td>${v.itemCount}</td><td>${v.restrictedCount}</td>
+        <td>${v.status==='EFFECTIVE'?'<span class="tag success">生效中</span>':'<span class="tag pending">已被取代</span>'}</td>
+        <td>${esc(v.operatorName)}</td><td>${esc(v.effectiveTime)}</td><td>${esc(v.reason)||''}</td>
+        <td><button class="sm gray" onclick="cpShowSnapshot(${v.id}, ${v.versionNo})">快照</button></td></tr>`).join('')
+      || '<tr><td class="muted">没有版本</td></tr>';
+    window.__cpVersions = vs;
+  }catch(e){ toast(e.message); }
+}
+
+function cpShowSnapshot(id, no){
+  const v = (window.__cpVersions||[]).find(x=>x.id===id);
+  const box = document.getElementById('cpVersionSnapshot');
+  box.style.display='block';
+  box.textContent = '名单 v'+no+' 全量快照：\n' + (v ? JSON.stringify(JSON.parse(v.snapshot), null, 2) : '找不到版本');
+}
+
+async function cpLoadOps(){
+  try{
+    const ops = await call('GET','/compliance/operations'+(val('cpOpCode')?'?categoryCode='+encodeURIComponent(val('cpOpCode')):''));
+    document.getElementById('cpOpTable').innerHTML =
+      '<tr><th>时间</th><th>类目</th><th>动作</th><th>操作人</th><th>依据</th><th>动作前</th><th>动作后</th><th>备注</th></tr>'
+      + ops.map(o=>`<tr>
+        <td style="white-space:nowrap">${esc(o.opTime)}</td>
+        <td>${esc(o.categoryName)}<br><span class="muted">${esc(o.categoryCode)}</span></td>
+        <td>${esc(o.action)}</td><td>${esc(o.operatorName)}</td>
+        <td style="max-width:240px">${esc(o.legalBasis)||''}</td>
+        <td><pre class="event" style="max-height:120px">${esc(o.beforeJson)||''}</pre></td>
+        <td><pre class="event" style="max-height:120px">${esc(o.afterJson)||''}</pre></td>
+        <td>${esc(o.remark)||''}</td></tr>`).join('')
+      || '<tr><td class="muted">没有操作记录</td></tr>';
+  }catch(e){ toast(e.message); }
+}
+
+function cpRenderFreeze(view, title){
+  document.getElementById('cpFreezeBox').style.display='block';
+  document.getElementById('cpFreezeBox').textContent =
+    title + '：类目「' + view.category.categoryName + '（' + view.category.categoryCode + '）」 — '
+    + '圈定 ' + view.totalCount + ' 张在途挂起授信单，含税占用合计 ' + (view.totalAmount||0) + ' 元'
+    + (view.affectedCount!=null ? '\n本次实际处理 '+view.affectedCount+' 张' : '');
+  document.getElementById('cpFreezeTable').innerHTML =
+    '<tr><th>单号</th><th>客户</th><th>画面</th><th>归属月</th><th>含税占用</th></tr>'
+    + view.orders.map(o=>`<tr><td>${esc(o.orderNo)}</td><td>${esc(o.customerName)}</td>
+      <td>${esc(o.creativeName)}</td><td>${esc(o.bizPeriod)}</td><td>${o.occupiedAmount==null?'-':o.occupiedAmount}</td></tr>`).join('')
+    || '<tr><td class="muted">没有圈定到在途单</td></tr>';
+}
+
+async function cpFreezePreview(){
+  const code = val('cpFreezeCode'); if(!code){ toast('请选择受限类目'); return; }
+  try{ cpRenderFreeze(await call('POST','/compliance/freeze/preview',{ categoryCode:code }),'待冻结预览'); }
+  catch(e){ toast(e.message); }
+}
+
+async function cpFreezeExecute(){
+  const code = val('cpFreezeCode'); if(!code){ toast('请选择受限类目'); return; }
+  if(!confirm('确认冻结该类目下全部在途挂起授信单？冻结后落架/对冲/更正/回退一律被拒。')) return;
+  try{
+    const v = await call('POST','/compliance/freeze/execute',{ categoryCode:code, remark:val('cpFreezeRemark') });
+    toast('已批量冻结 '+v.affectedCount+' 张在途单，逐单事件已留底',true); cpRenderFreeze(v,'冻结完成');
+  }catch(e){ toast(e.message); }
+}
+
+async function cpUnfreezePreview(){
+  const code = val('cpFreezeCode'); if(!code){ toast('请选择类目'); return; }
+  try{ cpRenderFreeze(await call('POST','/compliance/unfreeze/preview',{ categoryCode:code }),'已冻结预览'); }
+  catch(e){ toast(e.message); }
+}
+
+async function cpUnfreezeExecute(){
+  const code = val('cpFreezeCode'); if(!code){ toast('请选择类目'); return; }
+  if(!confirm('确认解冻该类目下此前冻结的在途单？解冻后恢复正常操作。')) return;
+  try{
+    const v = await call('POST','/compliance/unfreeze/execute',{ categoryCode:code, remark:val('cpFreezeRemark') });
+    toast('已批量解冻 '+v.affectedCount+' 张在途单',true); cpRenderFreeze(v,'解冻完成');
+  }catch(e){ toast(e.message); }
 }
 
 init();

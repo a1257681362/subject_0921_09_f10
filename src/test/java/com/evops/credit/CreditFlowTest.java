@@ -123,6 +123,7 @@ class CreditFlowTest {
     private Customer createCustomer(String name, String limit, Viewer owner) {
         CustomerCreateRequest req = new CustomerCreateRequest();
         req.setCustomerName(name);
+        req.setIndustryCategoryCode("RETAIL"); // F10 建档必填行业类目；零售为预置普通类目
         req.setCreditLimit(new BigDecimal(limit));
         return customerService.create(req, owner);
     }

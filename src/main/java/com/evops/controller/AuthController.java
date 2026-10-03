@@ -50,6 +50,19 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<Object> me(HttpServletRequest request) {
         Subject subject = SecurityUtils.getSubject();
-        return ApiResponse.ok(Collections.singletonMap("username", subject.getPrincipal()));
+        java.util.Map<String, Object> info = new java.util.LinkedHashMap<>();
+        Object principal = subject.getPrincipal();
+        info.put("username", principal);
+        java.util.List<String> roles = new java.util.ArrayList<>();
+        for (String role : new String[]{"system", "finance", "compliance", "sales", "inspector",
+                "vendor", "installer", "agent"}) {
+            if (subject.hasRole(role)) {
+                roles.add(role);
+            }
+        }
+        info.put("roles", roles);
+        info.put("complianceMaintainer",
+                subject.hasRole("system") || subject.hasRole("compliance"));
+        return ApiResponse.ok(info);
     }
 }

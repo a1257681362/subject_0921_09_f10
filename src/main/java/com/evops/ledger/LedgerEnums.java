@@ -30,6 +30,9 @@ public final class LedgerEnums {
     public static final String EVENT_TAKE_DOWN = "TAKE_DOWN";
     public static final String EVENT_OFFSET = "OFFSET";
     public static final String EVENT_ROLLBACK = "ROLLBACK";
+    /** F10 合规批量冻结 / 解冻（受限行业名单联动，不动授信占用） */
+    public static final String EVENT_COMPLIANCE_FREEZE = "COMPLIANCE_FREEZE";
+    public static final String EVENT_COMPLIANCE_UNFREEZE = "COMPLIANCE_UNFREEZE";
 
     /** 经纬度建档状态：未建档 / 已建档 */
     public static final String GEO_UNFILED = "UNFILED";

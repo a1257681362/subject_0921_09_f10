@@ -134,6 +134,7 @@ public class OrderService {
     public PostingOrder takeDown(String orderNo, ActionRequest request) {
         PostingOrder order = requireByNo(orderNo);
         requireHung(order, "落架");
+        requireNotFrozen(order, "落架");
         LocalDate occurDate = request.getOccurDate() != null ? request.getOccurDate() : LocalDate.now();
         String operator = Operators.resolve(request.getOperatorName());
 
@@ -156,6 +157,7 @@ public class OrderService {
     public PostingOrder offset(String orderNo, ActionRequest request) {
         PostingOrder original = requireByNo(orderNo);
         requireHung(original, "对冲");
+        requireNotFrozen(original, "对冲");
         LocalDate occurDate = request.getOccurDate() != null ? request.getOccurDate() : LocalDate.now();
         String operator = Operators.resolve(request.getOperatorName());
         String reason = request.getReason() != null && !request.getReason().trim().isEmpty()
@@ -210,6 +212,7 @@ public class OrderService {
     public PostingOrder edit(String orderNo, OrderEditRequest request) {
         PostingOrder order = requireByNo(orderNo);
         requireHung(order, "修改");
+        requireNotFrozen(order, "留痕更正");
         String operator = Operators.resolve(request.getOperatorName());
 
         order.setCreativeName(request.getCreativeName().trim());
@@ -229,6 +232,7 @@ public class OrderService {
     public PostingOrder rollback(String orderNo, RollbackRequest request) {
         PostingOrder order = requireByNo(orderNo);
         requireHung(order, "版本回退");
+        requireNotFrozen(order, "版本回退");
         int target = request.getTargetVersion();
         if (target >= order.getVersionNo()) {
             throw new BusinessException("目标版本 v" + target + " 不是历史版本，当前版本 v" + order.getVersionNo());
@@ -322,6 +326,14 @@ public class OrderService {
             throw new BusinessException("单据 " + order.getOrderNo() + " 已关闭（"
                     + statusText(order.getStatus()) + "），不能" + action
                     + "；如需更正请另开对冲单");
+        }
+    }
+
+    /** 合规冻结单：落架/对冲/更正/回退全部拒绝，解冻后恢复；原因带类目与依据，随冻结动作留底。 */
+    private void requireNotFrozen(PostingOrder order, String action) {
+        if (order.getComplianceFrozen() != null && order.getComplianceFrozen() == 1) {
+            throw new BusinessException("单据 " + order.getOrderNo() + " 已被合规冻结，不能" + action
+                    + "（" + order.getFreezeReason() + "）；请联系合规岗核对后解冻");
         }
     }
 

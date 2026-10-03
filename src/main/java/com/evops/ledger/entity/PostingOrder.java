@@ -53,6 +53,10 @@ public class PostingOrder extends BaseEntity {
     private String installStatus;
     /** 安装完工回传时刻 */
     private LocalDateTime installFinishTime;
+    /** 合规冻结：1 已冻结（禁止落架/对冲/更正/回退）/ 0 正常 */
+    private Integer complianceFrozen;
+    /** 冻结原因（类目+依据+冻结操作人），解冻不清空以便留底 */
+    private String freezeReason;
     private String offsetReason;
     /** 开单经手人 */
     private String operatorName;

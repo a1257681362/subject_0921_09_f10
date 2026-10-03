@@ -3,6 +3,8 @@ package com.evops.credit.gateway;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.evops.common.BusinessException;
 import com.evops.common.Viewer;
+import com.evops.compliance.entity.IndustryCategory;
+import com.evops.compliance.service.IndustryCategoryService;
 import com.evops.credit.entity.CreditOccupation;
 import com.evops.credit.entity.Customer;
 import com.evops.credit.service.CreditService;
@@ -33,17 +35,20 @@ public class CreditPostingGateway implements PostingCreditGateway {
     private final PostingOrderMapper orderMapper;
     private final CustomerService customerService;
     private final CreditService creditService;
+    private final IndustryCategoryService categoryService;
 
     public CreditPostingGateway(QuoteMapper quoteMapper,
                                 QuoteLineMapper quoteLineMapper,
                                 PostingOrderMapper orderMapper,
                                 CustomerService customerService,
-                                CreditService creditService) {
+                                CreditService creditService,
+                                IndustryCategoryService categoryService) {
         this.quoteMapper = quoteMapper;
         this.quoteLineMapper = quoteLineMapper;
         this.orderMapper = orderMapper;
         this.customerService = customerService;
         this.creditService = creditService;
+        this.categoryService = categoryService;
     }
 
     @Override
@@ -71,6 +76,13 @@ public class CreditPostingGateway implements PostingCreditGateway {
         }
         // 销售只能给自己名下客户上刊占额；财务/系统不受限
         Viewer.forOperator(operatorName).checkOwn(customer.getOwnerSales());
+
+        // 上刊提交口行业复查：堵“建档时未受限、后来进了名单”的新单，命中整体回滚（单据、档期、占用都不落）
+        IndustryCategory restricted = categoryService.findRestricted(customer.getIndustryCategoryCode());
+        if (restricted != null) {
+            throw new BusinessException(IndustryCategoryService.rejectMessage(restricted, "授信上刊提交")
+                    + "；客户：" + customer.getCustomerName() + "，报价单：" + qno);
+        }
 
         BigDecimal amount = quote.getTotalInclTax();
         CreditOccupation occ;

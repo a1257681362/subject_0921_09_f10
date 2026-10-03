@@ -3,6 +3,9 @@ package com.evops.credit.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.evops.common.BusinessException;
 import com.evops.common.Viewer;
+import com.evops.compliance.ComplianceEnums;
+import com.evops.compliance.entity.IndustryCategory;
+import com.evops.compliance.service.IndustryCategoryService;
 import com.evops.credit.CreditEnums;
 import com.evops.credit.dto.CustomerCreateRequest;
 import com.evops.credit.entity.CreditLimitVersion;
@@ -28,11 +31,14 @@ public class CustomerService {
 
     private final CustomerMapper customerMapper;
     private final CreditLimitVersionMapper versionMapper;
+    private final IndustryCategoryService categoryService;
 
     public CustomerService(CustomerMapper customerMapper,
-                           CreditLimitVersionMapper versionMapper) {
+                           CreditLimitVersionMapper versionMapper,
+                           IndustryCategoryService categoryService) {
         this.customerMapper = customerMapper;
         this.versionMapper = versionMapper;
+        this.categoryService = categoryService;
     }
 
     /** 客户建档：给信用额度，自动记 v1（INITIAL，直接生效，前值 0）。 */
@@ -46,6 +52,17 @@ public class CustomerService {
                 : viewer.getUsername();
         BigDecimal limit = normalizeMoney(request.getCreditLimit());
 
+        // 建档口行业校验：不存在/停用类目拒选；命中受限当场拒，话术带法规依据
+        IndustryCategory category = categoryService.requireByCode(request.getIndustryCategoryCode());
+        if (!ComplianceEnums.CATEGORY_ACTIVE.equals(category.getStatus())) {
+            throw new BusinessException("行业类目「" + category.getCategoryName() + "（"
+                    + category.getCategoryCode() + "）」已停用，不能用于客户建档，请选在档类目");
+        }
+        IndustryCategory restricted = categoryService.findRestricted(category.getCategoryCode());
+        if (restricted != null) {
+            throw new BusinessException(IndustryCategoryService.rejectMessage(restricted, "客户建档"));
+        }
+
         Long dup = customerMapper.selectCount(
                 new LambdaQueryWrapper<Customer>().eq(Customer::getCustomerName, name));
         if (dup != null && dup > 0) {
@@ -55,6 +72,9 @@ public class CustomerService {
         Customer customer = new Customer();
         customer.setCustomerNo(generateCustomerNo());
         customer.setCustomerName(name);
+        // 编码+名称随档固化，之后类目改名不回写旧客户
+        customer.setIndustryCategoryCode(category.getCategoryCode());
+        customer.setIndustryCategoryName(category.getCategoryName());
         customer.setOwnerSales(owner);
         customer.setCreditLimit(limit);
         customer.setOccupiedAmount(BigDecimal.ZERO.setScale(MONEY_SCALE, RoundingMode.HALF_UP));

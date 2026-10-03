@@ -19,6 +19,10 @@ public class Customer extends BaseEntity {
     private String customerNo;
     /** 客户名称，全局唯一（报价单按它认领客户） */
     private String customerName;
+    /** 行业类目编码（建档时从受限行业名单取，命中受限建档即拒） */
+    private String industryCategoryCode;
+    /** 行业类目名称快照（之后类目改名不回写旧客户） */
+    private String industryCategoryName;
     /** 归属销售账号（销售只能看/操作自己名下客户） */
     private String ownerSales;
     /** 信用额度（当前生效版本后值） */
